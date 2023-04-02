@@ -1,10 +1,10 @@
-use crate::{error::parse_error::ParseError, iter::TokenIter};
+use crate::{TokenIter, ParseError};
 
-pub trait ConsumableToken: PartialEq + Clone{
+pub trait ConsumableToken: Clone {
     fn stateless_equals(&self, other: &Self) -> bool;
 }
 
-pub trait Parsable<T>: PartialEq + Clone
+pub trait Parsable<T>
 where T: ConsumableToken
 {
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
@@ -15,7 +15,7 @@ where T: ConsumableToken
     }
 }
 
-pub trait Expectable<T>: PartialEq + Clone
+pub trait Expectable<T>
 where T: ConsumableToken
 {
     fn expect(iter:&mut TokenIter<T>, expected_token: T) -> Result<Self, ParseError<T>>

@@ -37,7 +37,7 @@ where
 {
     fn expect(iter: &mut TokenIter<T>, expected_token: T) -> Result<Self, ParseError<T>> {
         match iter.get(iter.current) {
-            Some(found_token) if found_token == expected_token => Ok(Some(expected_token)),
+            Some(found_token) if found_token.stateless_equals(&expected_token) => Ok(Some(expected_token)),
             _ => Ok(None),
         }
     }
