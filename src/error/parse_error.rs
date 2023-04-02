@@ -1,47 +1,73 @@
-use std::marker::PhantomData;
+use syn::parse::Parse;
 
-use crate::Parsable;
-
+use crate::{Parsable, ConsumableToken};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseErrorType<T>
-{
-    ExpectationError(ExpectationError<T>),
-    FailedToParseBranch(Box<ParseError<T>>),
-}
-
-pub enum ExpectationError<T> {
-    UnexpectedToken {
-        expected: T,
-        found: T,
-    },
+pub enum ParseErrorType<T> 
+where T: ConsumableToken{
+    UnexpectedToken { expected: T, found: T },
     NoMoreTokens,
+    ConjunctBranchParsingFailure(Box<ParseError<T>>),
+    DisjunctBranchParsingFailure(Vec<ParseError<T>>),
 }
 
-#[derive(Debug, Clone, Eq)]
-pub struct ParseError<T>
-{
+/// When parsing a single token, type_name will be none
+/// type_name will be Some(type_name) when parsing a type
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseError<T> 
+where T: ConsumableToken{
     failed_at: usize,
     failure_type: ParseErrorType<T>,
-    type_name: syn::Ident,
+    type_name: Option<String>,
 }
 
+impl<T> ParseError<T>
+where
+    T: ConsumableToken,
+    
+{
 
-
-
-
-impl <P,T> ParseError<T> where P: Parsable<T> ,
-T: Parsable<T>{
-    pub fn from_failed_expectation(expectation_error: ExpectationError<T>) -> Self {
-        ParseError { failed_at: (), failure_type: (), type_name: () }
+    pub fn new(failed_at: usize, failure_type: ParseErrorType<T>, type_name: Option<String>) -> Self {
+        Self {
+            failed_at,
+            failure_type,
+            type_name
+        }
 
     }
-
-    pub fn from_branch_error(other: ParseError<T>) -> Self {
-        let new_parse_error = other.clone();
-        new_parse_error.failure_type = Box::new(other);
-        new_parse_error.type_name = P::identifier();
-        new_parse_error
+    pub fn from_conjunct_error(type_name: String, other: ParseError<T>) -> Self {
+        ParseError {
+            failed_at: other.failed_at,
+            failure_type: ParseErrorType::ConjunctBranchParsingFailure(Box::new(other)),
+            type_name: Some(type_name),
+        }
     }
 
+    pub fn unexpected_token(failed_at: usize, expected: T, found: T) -> Self {
+        ParseError {
+            failed_at,
+            failure_type: crate::ParseErrorType::UnexpectedToken {
+                expected,
+                found,
+            },
+            type_name: None,
+        }
+    }
+
+    pub fn no_mode_tokens(failed_at: usize) -> Self {
+        ParseError {
+            failed_at,
+            failure_type: crate::ParseErrorType::NoMoreTokens ,
+            type_name: None,
+        }
+    }
+
+    pub fn from_disjunct_errors(type_name: String, failed_at: usize, branches: Vec<ParseError<T>>) -> ParseError<T>{
+        ParseError {
+            failed_at,
+            failure_type: ParseErrorType::DisjunctBranchParsingFailure(branches),
+            type_name: Some(type_name),
+        }
+
+    }
 }

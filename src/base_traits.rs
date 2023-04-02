@@ -1,20 +1,29 @@
+use proc_macro2::Span;
+
 use crate::{error::parse_error::ParseError, iter::TokenIter};
-pub trait Parsable<T>: PartialEq 
-{
-    fn expect(iter: &mut TokenIter<T>, p: Self) -> Result<Self, ParseError<Self,T>>
-    where
-        Self: Sized {
-        // <Self as Parsable<T>>::parse(iter)
-        // .and_then(|r| r.default())
-        todo!()
 
-    }
-
-    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<Self,T>>
-    where Self:Sized;
-
-    fn identifier() -> syn::Ident;
-
+pub trait ConsumableToken: PartialEq + Clone{
+    fn stateless_equals(&self, other: &Self) -> bool;
 }
 
+pub trait Parsable<T>: PartialEq + Clone
+where T: ConsumableToken
+{
+    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+    where Self:Sized;
 
+    fn identifier() -> String{
+        std::any::type_name::<Self>().to_string()
+    }
+}
+
+pub trait Expectable<T>: PartialEq + Clone
+where T: ConsumableToken
+{
+    fn expect(iter:&mut TokenIter<T>, expected_token: T) -> Result<Self, ParseError<T>>
+    where Self:Sized;
+
+    fn identifier() -> String {
+        std::any::type_name::<Self>().to_string()
+    }
+}

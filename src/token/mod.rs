@@ -1,4 +1,4 @@
-use crate::{ TokenIter, Parsable, ParseError};
+use crate::{Expectable, ParseError, ParseErrorType, TokenIter, ConsumableToken};
 
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct LiteralStringValue {
@@ -79,14 +79,6 @@ impl Token {
         (token, input.len())
     }
 
-    pub fn stateless_equals(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Token::LiteralString(_), Token::LiteralString(_)) => true,
-            (Token::LiteralInt(_), Token::LiteralInt(_)) => true,
-            (Token::Identifier(_), Token::Identifier(_)) => true,
-            _ => self == other,
-        }
-    }
 }
 
 #[macro_export]
@@ -213,29 +205,34 @@ macro_rules! t {
     };
 }
 
-
-impl Parsable<Token> for Token {
-    fn expect(iter: &mut TokenIter<Token>, token: Token) -> Result<Self, ParseError<Token>> {
-        let result = iter.consume().ok_or(ParseError::NoMoreTokens {
-            died_before_token: token.clone(),
-        })?;
-        if result.stateless_equals(&token) {
-            Ok(result)
-        } else {
-            Err(ParseError::UnexpectedToken {
-                expected: token,
-                found: result,
-            })
+impl ConsumableToken for Token {
+    fn stateless_equals(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Token::LiteralString(_), Token::LiteralString(_)) => true,
+            (Token::LiteralInt(_), Token::LiteralInt(_)) => true,
+            (Token::Identifier(_), Token::Identifier(_)) => true,
+            _ => self == other,
         }
     }
-
-    fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Self>>
-    where Self:Sized {
-        unimplemented!("Tokens can only be parsed by instance");
-    }
-
-    fn identifier() -> String {
-        "Token".to_string()
-        
+}
+/// One can expect a Token from a TokenIter<T>
+impl Expectable<Token> for Token {
+    fn expect(
+        iter: &mut TokenIter< Token>,
+        expected: Token,
+    ) -> Result<Self, ParseError<Token>>
+    where
+        Self: Sized,
+    {
+        match iter.consume() {
+            Some(found) => {
+                if expected.stateless_equals(&found) {
+                    Ok(expected)
+                } else {
+                    Err(ParseError::unexpected_token(iter.current, expected, found))
+                }
+            }
+            None => Err(ParseError::no_mode_tokens(iter.current)),
+        }
     }
 }
