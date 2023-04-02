@@ -1,4 +1,4 @@
-use crate::{Expectable, ParseError, ParseErrorType, TokenIter, ConsumableToken};
+use crate::{Expectable, ParseError, TokenIter, ConsumableToken};
 
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct LiteralStringValue {

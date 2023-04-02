@@ -1,4 +1,4 @@
-use crate::{base_traits::Parsable, error::parse_error::ParseError, ParseErrorType, Expectable, ConsumableToken};
+use crate::{base_traits::Parsable, error::parse_error::ParseError, ConsumableToken};
 
 pub struct TokenIter<Token> {
     pub current: usize,

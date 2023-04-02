@@ -1,6 +1,4 @@
-use syn::parse::Parse;
-
-use crate::{Parsable, ConsumableToken};
+use crate::ConsumableToken;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseErrorType<T> 
