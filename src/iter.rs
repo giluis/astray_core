@@ -106,7 +106,7 @@ where
 
     // TODO: this clone is expensive in the long run
     // I must find a way to prevent it from happening
-    fn expect_match<F>(&mut self, matches:F, msg: String) -> Result<Token,ParseError<Token>> 
+    pub fn expect_match<F>(&mut self, matches:F, msg: String) -> Result<Token,ParseError<Token>> 
     where F: FnOnce(&Token) -> bool  {
         self.try_do(|token_iter|{
             match token_iter.consume() {
