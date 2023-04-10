@@ -232,7 +232,7 @@ impl Expectable<Token> for Token {
                     Err(ParseError::unexpected_token(iter.current, expected, found))
                 }
             }
-            None => Err(ParseError::no_mode_tokens(iter.current)),
+            None => Err(ParseError::no_more_tokens(iter.current)),
         }
     }
 }

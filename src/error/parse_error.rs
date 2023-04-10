@@ -5,6 +5,7 @@ pub enum ParseErrorType<T>
 where T: ConsumableToken{
     UnexpectedToken { expected: T, found: T },
     NoMoreTokens,
+    UnmatchingToken { found: T, error_msg: String},
     ConjunctBranchParsingFailure(Box<ParseError<T>>),
     DisjunctBranchParsingFailure(Vec<ParseError<T>>),
 }
@@ -52,7 +53,7 @@ where
         }
     }
 
-    pub fn no_mode_tokens(failed_at: usize) -> Self {
+    pub fn no_more_tokens(failed_at: usize) -> Self {
         ParseError {
             failed_at,
             failure_type: crate::ParseErrorType::NoMoreTokens ,
@@ -65,6 +66,15 @@ where
             failed_at,
             failure_type: ParseErrorType::DisjunctBranchParsingFailure(branches),
             type_name: Some(type_name),
+        }
+
+    }
+
+    pub fn unmatching_token(failed_at: usize, error_msg: String, found: T) -> ParseError<T>{
+        ParseError {
+            failed_at,
+            failure_type: ParseErrorType::UnmatchingToken { found, error_msg},
+            type_name: None,
         }
 
     }

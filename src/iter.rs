@@ -7,7 +7,7 @@ pub struct TokenIter<Token> {
     pub stack: Vec<usize>,
 }
 
-impl<Token> TokenIter< Token>
+impl<Token> TokenIter<Token>
 where
     Token: ConsumableToken,
 {
@@ -20,7 +20,7 @@ where
         }
     }
 
-    pub fn parse<P>(& mut self) -> Result<P, ParseError<Token>>
+    pub fn parse<P>(&mut self) -> Result<P, ParseError<Token>>
     where
         P: Parsable<Token>,
     {
@@ -35,7 +35,7 @@ where
         result
     }
 
-    pub fn try_do<F, Q, E>(& mut self, f: F) -> Result<Q, E>
+    pub fn try_do<F, Q, E>(&mut self, f: F) -> Result<Q, E>
     where
         F: FnOnce(&mut TokenIter<Token>) -> Result<Q, E>,
     {
@@ -49,14 +49,13 @@ where
         result
     }
 
-    pub fn expect(& mut self, expected: Token) -> Result<Token, ParseError<Token>> {
+    pub fn expect(&mut self, expected: Token) -> Result<Token, ParseError<Token>> {
         self.try_do(|token_iter| {
             token_iter
                 .consume()
-                .ok_or(ParseError::no_mode_tokens(token_iter.current))
+                .ok_or(ParseError::no_more_tokens(token_iter.current))
                 .and_then(|found| {
                     if found.stateless_equals(&expected) {
-                        // it's important
                         Ok(found)
                     } else {
                         Err(ParseError::unexpected_token(
@@ -104,12 +103,46 @@ where
             None
         }
     }
+
+    // TODO: this clone is expensive in the long run
+    // I must find a way to prevent it from happening
+    fn expect_match<F>(&mut self, matches:F, msg: String) -> Result<Token,ParseError<Token>> 
+    where F: FnOnce(&Token) -> bool  {
+        self.try_do(|token_iter|{
+            match token_iter.consume() {
+                Some(ref found) if matches(found) => Ok(found.clone()),
+                Some(ref found) => Err(ParseError::unmatching_token(token_iter.current, msg, found.clone())),
+                _ => Err(ParseError::no_more_tokens(token_iter.current))
+            }
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::test_common::TestStruct;
     use crate::{t, Parsable, Token, TokenIter};
+
+    #[test]
+    fn expect_match_enum_token() {
+        let mut iter: TokenIter<Token> = TokenIter::new(vec![
+            Token::Comma,
+            Token::Identifier("Some identifier".to_string()),
+        ]);
+
+        let result = iter.expect_match(|t| matches!(t,Token::Comma), "no message".to_string()); 
+        assert_eq!(result,Ok(Token::Comma));
+
+        let result = iter.expect_match(|t| matches!(t, Token::Identifier(_)), "no message".to_string());
+        assert_eq!(result,Ok(Token::Identifier("Some identifier".to_string())));
+
+        let mut iter: TokenIter<Token> = TokenIter::new(vec![
+            Token::Identifier("Some identifier".to_string()),
+        ]);
+
+        let result = iter.expect_match(|t| matches!(t, Token::Comma), "no message".to_string());
+        assert!(result.is_err());
+    }
 
     //TODO: check error is the correct one
     #[test]
