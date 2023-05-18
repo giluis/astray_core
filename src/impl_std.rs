@@ -62,7 +62,7 @@ mod tests {
         where
             Self: Sized,
         {
-            let ident = match iter.expect(Token::Identifier(Default::default()))?{
+            let ident = match iter.expect(|tok|matches!(tok, Token::Identifier(_)))?{
                 Token::Identifier(string) => string,
                 _ => unreachable!("Domain error: token returned by expect should be of the same variant as the token passed as argument"),
             };

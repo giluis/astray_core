@@ -1,6 +1,6 @@
 [package]
 name = "astray_core"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 license = "MIT"
 description = "Core functionality of the astray macro"
@@ -12,6 +12,6 @@ categories = ["compilers", "parsing", "text-processing", "algorithms"]
 
 [dependencies]
 hatch_result = "0.1.7"
-syn = "1.0.109"
+syn = "2.0.15"
 quote = "1.0.23"
 proc-macro2 = "1.0.51"

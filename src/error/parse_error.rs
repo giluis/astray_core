@@ -5,7 +5,7 @@ pub enum ParseErrorType<T>
 where T: ConsumableToken{
     UnexpectedToken { expected: T, found: T },
     NoMoreTokens,
-    UnmatchingToken { found: T, error_msg: String},
+    UnmatchingToken { found: T, error_msg: Option<String>},
     ConjunctBranchParsingFailure(Box<ParseError<T>>),
     DisjunctBranchParsingFailure(Vec<ParseError<T>>),
 }
@@ -73,7 +73,7 @@ where
     pub fn unmatching_token(failed_at: usize, error_msg: String, found: T) -> ParseError<T>{
         ParseError {
             failed_at,
-            failure_type: ParseErrorType::UnmatchingToken { found, error_msg},
+            failure_type: ParseErrorType::UnmatchingToken { found, error_msg: Some(error_msg)},
             type_name: None,
         }
 
