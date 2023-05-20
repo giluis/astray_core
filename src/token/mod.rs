@@ -1,4 +1,4 @@
-use crate::{Expectable, ParseError, TokenIter, ConsumableToken};
+use crate::ConsumableToken;
 
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct LiteralStringValue {
@@ -212,27 +212,6 @@ impl ConsumableToken for Token {
             (Token::LiteralInt(_), Token::LiteralInt(_)) => true,
             (Token::Identifier(_), Token::Identifier(_)) => true,
             _ => self == other,
-        }
-    }
-}
-/// One can expect a Token from a TokenIter<T>
-impl Expectable<Token> for Token {
-    fn expect(
-        iter: &mut TokenIter< Token>,
-        expected: Token,
-    ) -> Result<Self, ParseError<Token>>
-    where
-        Self: Sized,
-    {
-        match iter.consume() {
-            Some(found) => {
-                if expected.stateless_equals(&found) {
-                    Ok(expected)
-                } else {
-                    Err(ParseError::unexpected_token(iter.current, expected, found))
-                }
-            }
-            None => Err(ParseError::no_more_tokens(iter.current)),
         }
     }
 }

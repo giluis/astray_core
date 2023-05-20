@@ -15,13 +15,13 @@ impl Parsable<Token> for TestStruct {
 
             let var_name = match token_iter.expect(|token|matches!(token, Token::Identifier(_)))? {
                 Token::Identifier(ident_str) => ident_str,
-                _ => panic!("Internal error, should be ident_str"),
+                _ => unreachable!("Internal error, should be ident_str"),
             };
 
-            let equals_sign = token_iter.expect(|token|matches!(token,t!( = ))).unwrap();
-            let value = match token_iter.expect(|token|matches!(token,t!(litint))).unwrap() {
+            let equals_sign = token_iter.expect(|token|matches!(token,t!( = )))?;
+            let value = match token_iter.expect(|token|matches!(token,Token::LiteralInt(_)))? {
                 Token::LiteralInt(value) => value,
-                _ => panic!("Internal error: should be lit int"),
+                _ => unreachable!("Internal error: should be lit int"),
             };
             Ok(TestStruct {
                 var_type,

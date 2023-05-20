@@ -35,13 +35,34 @@ impl<T> Expectable<T> for Option<T>
 where
     T: ConsumableToken,
 {
-    fn expect(iter: &mut TokenIter<T>, expected_token: T) -> Result<Self, ParseError<T>> {
+    fn expect<F: Fn(&T) -> bool>(
+        iter: &mut TokenIter<T>,
+        matches: F,
+    ) -> Result<Self, ParseError<T>> {
         match iter.get(iter.current) {
-            Some(found_token) if found_token.stateless_equals(&expected_token) => Ok(Some(expected_token)),
+            Some(found) if matches(&found) => Ok(Some(found)),
             _ => Ok(None),
         }
     }
 }
+
+impl<T> Expectable<T> for Vec<T>
+where
+    T: ConsumableToken,
+{
+    fn expect<F>(iter: &mut TokenIter<T>, matches: F) -> Result<Vec<T>, ParseError<T>>
+    where
+        F: Fn(&T) -> bool,
+    {
+        let mut result = vec![];
+        while let Some(found) = iter.get(iter.current) && matches(&found){
+            result.push(found);
+            iter.current += 1;
+        }
+        Ok(result)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -66,9 +87,53 @@ mod tests {
                 Token::Identifier(string) => string,
                 _ => unreachable!("Domain error: token returned by expect should be of the same variant as the token passed as argument"),
             };
-            let semi = <Option<Token> as Expectable<Token>>::expect(iter, Token::SemiColon)?;
+            let semi = <Option<Token> as Expectable<Token>>::expect(iter, |tok| {
+                matches!(tok, Token::SemiColon)
+            })?;
             Ok(TestStruct { ident, semi })
         }
+    }
+
+    #[derive(Debug, PartialEq, Clone)]
+    struct VecStruct {
+        idents: Vec<Token>,
+    }
+    
+    impl Parsable<Token> for VecStruct {
+        fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
+        where
+            Self: Sized,
+        {
+            let idents = Vec::expect(iter, |tok| matches!(tok,Token::Identifier(_)))?;
+            Ok(VecStruct {
+                idents
+            })
+        }
+    }
+
+
+    #[test]
+    fn parse_vec_with_many_elements() {
+        let tokens = vec![t!(ident "ident1"), t!(ident "ident2")];
+
+        let result = VecStruct::parse(&mut TokenIter::new(tokens)).expect("Should be ok");
+        assert_eq!(result.idents,vec![Token::Identifier("ident1".to_owned()), Token::Identifier("ident2".to_owned())]);
+    }
+
+    #[test]
+    fn parse_vec_with_one_element() {
+        let tokens = vec![t!(ident "ident1")];
+
+        let result = VecStruct::parse(&mut TokenIter::new(tokens)).expect("Should be ok");
+        assert_eq!(result.idents,vec![Token::Identifier("ident1".to_owned())]);
+    }
+
+    #[test]
+    fn parse_vec_with_zero_elements() {
+        let tokens = vec![];
+
+        let result = VecStruct::parse(&mut TokenIter::new(tokens)).expect("Should be ok");
+        assert_eq!(result.idents,vec![]);
     }
 
     #[test]
@@ -76,7 +141,7 @@ mod tests {
         let tokens = vec![t!(ident "ident1")];
 
         let result = TestStruct::parse(&mut TokenIter::new(tokens)).expect("Should be ok");
-        assert_eq!(result.ident,"ident1");
+        assert_eq!(result.ident, "ident1");
         assert!(result.semi.is_none());
     }
 
