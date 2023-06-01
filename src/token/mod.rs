@@ -1,4 +1,4 @@
-use crate::ConsumableToken;
+use crate::{ConsumableToken, Expectable, ParseError};
 
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct LiteralStringValue {
@@ -79,6 +79,22 @@ impl Token {
         (token, input.len())
     }
 
+}
+
+impl Expectable<Token> for Token {
+    fn expect<F: Fn(&Token) -> bool>(iter: &mut crate::TokenIter<Token>, matches: F) -> Result<Self, crate::ParseError<Token>>
+    where
+        Self: Sized {
+        match iter.consume() {
+            Some(ref found) if matches(found) => Ok(found.clone()),
+            Some(ref found) => Err(ParseError::unmatching_token(
+                iter.current,
+                "Failed to expected token not found".to_string(),
+                found.clone(),
+            )),
+            _ => Err(ParseError::no_more_tokens(iter.current)),
+        }
+    }
 }
 
 #[macro_export]

@@ -1,4 +1,4 @@
-use crate::{base_traits::Parsable, error::parse_error::ParseError, ConsumableToken};
+use crate::{base_traits::Parsable, error::parse_error::ParseError, ConsumableToken, Expectable};
 
 pub struct TokenIter<Token> {
     pub current: usize,
@@ -41,7 +41,6 @@ where
         result
     }
 
-
     pub fn consume(&mut self) -> Option<Token> {
         match self.get(self.current) {
             Some(element) => {
@@ -60,19 +59,12 @@ where
         }
     }
 
-    pub fn expect<F>(&mut self, matches: F) -> Result<Token, ParseError<Token>>
+    pub fn expect<F, E>(&mut self, matches: F) -> Result<E, ParseError<Token>>
     where
-        F: FnOnce(&Token) -> bool,
+        F: Fn(&Token) -> bool,
+        E: Expectable<Token>,
     {
-        self.try_do(|token_iter| match token_iter.consume() {
-            Some(ref found) if matches(found) => Ok(found.clone()),
-            Some(ref found) => Err(ParseError::unmatching_token(
-                token_iter.current,
-                "Failed to expected token not found".to_string(),
-                found.clone(),
-            )),
-            _ => Err(ParseError::no_more_tokens(token_iter.current)),
-        })
+        self.try_do(|token_iter| E::expect(token_iter, matches))
     }
     // TODO: this clone is expensive in the long run
     // I must find a way to prevent it from happening
@@ -110,13 +102,13 @@ mod tests {
         let result = iter.expect(|t| matches!(t, Token::Identifier(_)));
         assert_eq!(result, Ok(Token::Identifier("Some identifier".to_string())));
 
-        let result = iter.expect(|t| matches!(t, Token::Identifier(_)));
+        let result: Result<Token,_> = iter.expect(|t| matches!(t, Token::Identifier(_)));
         assert_eq!(result, Err(ParseError::no_more_tokens(2)));
 
         let mut iter: TokenIter<Token> =
             TokenIter::new(vec![Token::Identifier("Some identifier".to_string())]);
 
-        let result = iter.expect(|t| matches!(t, Token::Comma));
+        let result: Result<Token,_> = iter.expect(|t| matches!(t, Token::Comma));
         assert!(result.is_err());
     }
 
@@ -125,7 +117,7 @@ mod tests {
     fn failed_expect() {
         let tokens = vec![t!(litint 32)];
         let mut iter = TokenIter::new(tokens);
-        let result = iter.expect(|tok| matches!(tok, t!(return)));
+        let result: Result<Token,_> = iter.expect(|tok| matches!(tok, t!(return)));
         assert!(result.is_err());
         assert!(iter.current == 0);
     }
@@ -216,7 +208,7 @@ mod tests {
         let tokens = vec![];
         let mut iter = TokenIter::new(tokens);
 
-        let result = iter.expect(|tok| matches!(tok, t!(l_paren)));
+        let result: Result<Token,_> = iter.expect(|tok| matches!(tok, t!(l_paren)));
         assert!(result.is_err());
         assert!(iter.current == 0);
     }
@@ -226,17 +218,17 @@ mod tests {
         let tokens = vec![t!(l_paren), t!(r_paren), t!(,), t!(litint 4)];
         let mut iter = TokenIter::new(tokens);
 
-        let lparen_r = iter.expect(|tok| matches!(tok, t!(l_paren)));
-        assert!(lparen_r.unwrap() == t!(l_paren));
+        let lparen_r: Token = iter.expect(|tok| matches!(tok, t!(l_paren))).unwrap();
+        assert!(lparen_r == t!(l_paren));
 
-        let rparen_r = iter.expect(|tok| matches!(tok, t!(r_paren)));
-        assert!(rparen_r.unwrap() == t!(r_paren));
+        let rparen_r: Token = iter.expect(|tok| matches!(tok, t!(r_paren))).unwrap();
+        assert!(rparen_r == t!(r_paren));
 
-        let comma_r = iter.expect(|tok| matches!(tok, t!( , )));
-        assert_eq!(comma_r.unwrap(), t!( , ));
+        let comma_r: Token = iter.expect(|tok| matches!(tok, t!( , ))).unwrap();
+        assert_eq!(comma_r, t!( , ));
 
-        let litint_r = iter.expect(|tok| matches!(tok, t!(litint 4)));
-        assert!(litint_r.unwrap() == t!(litint 4));
+        let litint_r: Token = iter.expect(|tok| matches!(tok, t!(litint 4))).unwrap();
+        assert!(litint_r == t!(litint 4));
 
         assert!(iter.current == 4)
     }

@@ -104,7 +104,7 @@ mod tests {
         where
             Self: Sized,
         {
-            let idents = Vec::expect(iter, |tok| matches!(tok,Token::Identifier(_)))?;
+            let idents = iter.expect(|tok| matches!(tok,Token::Identifier(_)))?;
             Ok(VecStruct {
                 idents
             })
