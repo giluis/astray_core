@@ -11,15 +11,15 @@ pub struct TestStruct {
 impl Parsable<Token> for TestStruct {
     fn parse<'a>(iter: &mut TokenIter<Token>) -> Result<TestStruct, ParseError<Token>> {
         iter.try_do(|token_iter| {
-            let var_type = token_iter.expect(|token|matches!(token,t!(int)))?;
+            let var_type = token_iter.parse_if_match(|token|matches!(token,t!(int)))?;
 
-            let var_name = match token_iter.expect(|token|matches!(token, Token::Identifier(_)))? {
+            let var_name = match token_iter.parse_if_match(|token|matches!(token, Token::Identifier(_)))? {
                 Token::Identifier(ident_str) => ident_str,
                 _ => unreachable!("Internal error, should be ident_str"),
             };
 
-            let equals_sign = token_iter.expect(|token|matches!(token,t!( = )))?;
-            let value = match token_iter.expect(|token|matches!(token,Token::LiteralInt(_)))? {
+            let equals_sign = token_iter.parse_if_match(|token|matches!(token,t!( = )))?;
+            let value = match token_iter.parse_if_match(|token|matches!(token,Token::LiteralInt(_)))? {
                 Token::LiteralInt(value) => value,
                 _ => unreachable!("Internal error: should be lit int"),
             };

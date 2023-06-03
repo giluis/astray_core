@@ -1,9 +1,8 @@
 use crate::{
     base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter, ConsumableToken,
-    Expectable,
 };
 
-impl<T, P> Parsable<T> for Vec<P>
+impl<T, P> Parsable<T, P> for Vec<P>
 where
     P: Parsable<T>,
     T: ConsumableToken,
@@ -15,9 +14,16 @@ where
         }
         Ok(results)
     }
+
+    fn parse_if_match<F>(iter: &mut TokenIter<T>, matches: F) -> Result<Vec<P>, ParseError<T>>
+    where
+        F: Fn(&P) -> bool,
+    {
+        Ok(iter.parse_while(matches))
+    }
 }
 
-impl<T, P> Parsable<T> for Option<P>
+impl<T, P> Parsable<T, P> for Option<P>
 where
     P: Parsable<T>,
     T: ConsumableToken,
@@ -26,50 +32,32 @@ where
         let r = P::parse(iter);
         match r {
             Ok(r) => Ok(Some(r)),
-            Err(_) => unimplemented!("Error types are necessary here"),
+            Err(_) => Ok(None),
         }
     }
-}
 
-impl<T> Expectable<T> for Option<T>
-where
-    T: ConsumableToken,
-{
-    fn expect<F: Fn(&T) -> bool>(
+    fn parse_if_match<F: Fn(&P) -> bool>(
         iter: &mut TokenIter<T>,
         matches: F,
-    ) -> Result<Self, ParseError<T>> {
-        match iter.get(iter.current) {
-            Some(found) if matches(&found) => Ok(Some(found)),
-            _ => Ok(None),
-        }
-    }
-}
-
-impl<T> Expectable<T> for Vec<T>
-where
-    T: ConsumableToken,
-{
-    fn expect<F>(iter: &mut TokenIter<T>, matches: F) -> Result<Vec<T>, ParseError<T>>
+    ) -> Result<Self, ParseError<T>>
     where
-        F: Fn(&T) -> bool,
+        Self: Sized,
     {
-        let mut result = vec![];
-        while let Some(found) = iter.get(iter.current) && matches(&found){
-            result.push(found);
-            iter.current += 1;
-        }
-        Ok(result)
+        Self::parse(iter).map(|result| {
+            if let Some(ref inner) = result && matches(inner) {
+                result
+            } else {
+                None
+            }
+        })
     }
 }
-
 
 #[cfg(test)]
 mod tests {
 
     use crate::{
         base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter, t, token::Token,
-        Expectable,
     };
 
     #[derive(Debug, PartialEq, Clone)]
@@ -83,11 +71,11 @@ mod tests {
         where
             Self: Sized,
         {
-            let ident = match iter.expect(|tok|matches!(tok, Token::Identifier(_)))?{
+            let ident= match iter.parse_if_match(|tok|matches!(tok, Token::Identifier(_)))?{
                 Token::Identifier(string) => string,
-                _ => unreachable!("Domain error: token returned by expect should be of the same variant as the token passed as argument"),
+                _ => unreachable!("Domain error: token returned by parse_if_match should be of the same variant as the token passed as argument"),
             };
-            let semi = <Option<Token> as Expectable<Token>>::expect(iter, |tok| {
+            let semi = <Option<Token> as Parsable<Token, Token>>::parse_if_match(iter, |tok| {
                 matches!(tok, Token::SemiColon)
             })?;
             Ok(TestStruct { ident, semi })
@@ -98,26 +86,29 @@ mod tests {
     struct VecStruct {
         idents: Vec<Token>,
     }
-    
+
     impl Parsable<Token> for VecStruct {
         fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
         where
             Self: Sized,
         {
-            let idents = iter.expect(|tok| matches!(tok,Token::Identifier(_)))?;
-            Ok(VecStruct {
-                idents
-            })
+            let idents = iter.parse_if_match(|tok| matches!(tok, Token::Identifier(_)))?;
+            Ok(VecStruct { idents })
         }
     }
-
 
     #[test]
     fn parse_vec_with_many_elements() {
         let tokens = vec![t!(ident "ident1"), t!(ident "ident2")];
 
         let result = VecStruct::parse(&mut TokenIter::new(tokens)).expect("Should be ok");
-        assert_eq!(result.idents,vec![Token::Identifier("ident1".to_owned()), Token::Identifier("ident2".to_owned())]);
+        assert_eq!(
+            result.idents,
+            vec![
+                Token::Identifier("ident1".to_owned()),
+                Token::Identifier("ident2".to_owned())
+            ]
+        );
     }
 
     #[test]
@@ -125,7 +116,7 @@ mod tests {
         let tokens = vec![t!(ident "ident1")];
 
         let result = VecStruct::parse(&mut TokenIter::new(tokens)).expect("Should be ok");
-        assert_eq!(result.idents,vec![Token::Identifier("ident1".to_owned())]);
+        assert_eq!(result.idents, vec![Token::Identifier("ident1".to_owned())]);
     }
 
     #[test]
@@ -133,7 +124,7 @@ mod tests {
         let tokens = vec![];
 
         let result = VecStruct::parse(&mut TokenIter::new(tokens)).expect("Should be ok");
-        assert_eq!(result.idents,vec![]);
+        assert_eq!(result.idents, vec![]);
     }
 
     #[test]

@@ -10,13 +10,12 @@ where T: ConsumableToken{
     DisjunctBranchParsingFailure(Vec<ParseError<T>>),
 }
 
-/// When parsing a single token, type_name will be none
-/// type_name will be Some(type_name) when parsing a type
+// TODO: Refactor type_name
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError<T> 
 where T: ConsumableToken{
     failed_at: usize,
-    failure_type: ParseErrorType<T>,
+    pub failure_type: ParseErrorType<T>,
     type_name: Option<String>,
 }
 
