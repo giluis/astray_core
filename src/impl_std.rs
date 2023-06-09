@@ -1,6 +1,62 @@
+use std::mem::MaybeUninit;
+
+use arr_macro::arr;
+
 use crate::{
     base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter, ConsumableToken,
 };
+
+impl<P1, P2, T> Parsable<T> for (P1, P2)
+where
+    P1: Parsable<T>,
+    P2: Parsable<T>,
+    T: ConsumableToken,
+{
+    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+    where
+        Self: Sized,
+    {
+        Ok((iter.parse()?, iter.parse()?))
+    }
+}
+
+impl<P1, P2, P3, T> Parsable<T> for (P1, P2, P3)
+where
+    P1: Parsable<T>,
+    P2: Parsable<T>,
+    P3: Parsable<T>,
+    T: ConsumableToken,
+{
+    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+    where
+        Self: Sized,
+    {
+        Ok((
+            iter.parse::<P1>()?,
+            iter.parse::<P2>()?,
+            iter.parse::<P3>()?,
+        ))
+    }
+}
+
+// #[macro_export]
+// macro_rules! impl_tuple {
+//     ($($tuplll:ty),*) => {
+//         impl<$($tuplll,)* T> Parsable<T> for ($($tuplll),*)
+//         where
+//             $($tuplll: Parsable<T>,)*
+//             T: ConsumableToken,
+//         {
+//             fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+//             where
+//                 Self: Sized,
+//             {
+//                 Ok(($(iter.parse::<$tuplll>()?,)*))
+//             }
+//         }
+//     };
+//     () => ()
+// }
 
 impl<T, P> Parsable<T, P> for Box<P>
 where
