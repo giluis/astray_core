@@ -20,6 +20,20 @@ where
         }
     }
 
+    pub fn try_do<F, Q, E>(&mut self, f: F) -> Result<Q, E>
+    where
+        F: FnOnce(&mut TokenIter<Token>) -> Result<Q, E>,
+    {
+        self.stack.push(self.current);
+        let result = f(self);
+        if result.is_ok() {
+            let _ = self.stack.pop();
+        } else if let Some(c) = self.stack.pop() {
+            self.current = c;
+        }
+        result
+    }
+
     pub fn parse<P>(&mut self) -> Result<P, ParseError<Token>>
     where
         P: Parsable<Token>,
@@ -34,20 +48,6 @@ where
         F: Fn(&Q) -> bool,
     {
         self.try_do(|token_iter| P::parse_if_match(token_iter, matcher))
-    }
-
-    pub fn try_do<F, Q, E>(&mut self, f: F) -> Result<Q, E>
-    where
-        F: FnOnce(&mut TokenIter<Token>) -> Result<Q, E>,
-    {
-        self.stack.push(self.current);
-        let result = f(self);
-        if result.is_ok() {
-            let _ = self.stack.pop();
-        } else if let Some(c) = self.stack.pop() {
-            self.current = c;
-        }
-        result
     }
 
     pub fn parse_while<I, F, Q>(&mut self, keep_going: F) -> I
@@ -269,6 +269,8 @@ mod tests {
 
     #[test]
     fn test_new_empty() {
+        let max = usize::MAX;
+        println!("{max}");
         let tokens = vec![];
         let iter = TokenIter::<Token>::new(tokens);
         assert_eq!(iter.current, 0);

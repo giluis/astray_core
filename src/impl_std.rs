@@ -2,6 +2,29 @@ use crate::{
     base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter, ConsumableToken,
 };
 
+impl<T, P> Parsable<T, P> for Box<P>
+where
+    P: Parsable<T>,
+    T: ConsumableToken,
+{
+    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+    where
+        Self: Sized,
+    {
+        Ok(Box::new(P::parse(iter)?))
+    }
+
+    fn parse_if_match<F: Fn(&P) -> bool>(
+        iter: &mut TokenIter<T>,
+        matches: F,
+    ) -> Result<Self, ParseError<T>>
+    where
+        Self: Sized,
+    {
+        Ok(Box::new(P::parse_if_match(iter, matches)?))
+    }
+}
+
 impl<T, P> Parsable<T, P> for Vec<P>
 where
     P: Parsable<T>,
@@ -87,7 +110,7 @@ mod tests {
         idents: Vec<Token>,
     }
 
-    impl Parsable<Token> for VecStruct {
+    impl Parsable<Token, Token> for VecStruct {
         fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
         where
             Self: Sized,
@@ -95,6 +118,91 @@ mod tests {
             let idents = iter.parse_if_match(|tok| matches!(tok, Token::Identifier(_)))?;
             Ok(VecStruct { idents })
         }
+        fn parse_if_match<F: Fn(&Token) -> bool>(
+            iter: &mut TokenIter<Token>,
+            f: F,
+        ) -> Result<Self, ParseError<Token>>
+        where
+            Self: Sized,
+        {
+            let idents = iter.parse_if_match(f)?;
+            Ok(VecStruct { idents })
+        }
+    }
+
+    #[derive(Debug, PartialEq, Clone)]
+    struct BoxStruct {
+        ident: Box<Token>,
+    }
+
+    impl Parsable<Token, Token> for BoxStruct {
+        fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
+        where
+            Self: Sized,
+        {
+            let ident = Box::parse(iter)?;
+            Ok(BoxStruct { ident })
+        }
+
+        fn parse_if_match<F: Fn(&Token) -> bool>(
+            iter: &mut TokenIter<Token>,
+            f: F,
+        ) -> Result<Self, ParseError<Token>>
+        where
+            Self: Sized,
+        {
+            let ident = Box::parse_if_match(iter, f)?;
+            Ok(BoxStruct { ident })
+        }
+    }
+
+    #[test]
+    fn box_ok() {
+        struct Test1 {
+            ident: Token,
+        }
+
+        let tokens = vec![t!(ident "hello")];
+        let result = BoxStruct::parse(&mut TokenIter::new(tokens)).unwrap();
+        assert_eq!(
+            result,
+            BoxStruct {
+                ident: Box::new(t!(ident "hello"))
+            }
+        );
+    }
+
+    #[test]
+    fn box_err() {
+        let tokens = vec![];
+        let result = BoxStruct::parse(&mut TokenIter::new(tokens));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn box_match() {
+        let tokens = vec![t!(ident "hello")];
+        let result = BoxStruct::parse_if_match(&mut TokenIter::new(tokens), |t| {
+            matches!(t, Token::Identifier(_))
+        });
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn vec_parse_if_match() {
+        let tokens = vec![t!(ident "ident1"), t!(ident "ident2")];
+
+        let result = VecStruct::parse_if_match(&mut TokenIter::new(tokens), |tok| {
+            matches!(tok, Token::Identifier(_))
+        })
+        .expect("Should be ok");
+        assert_eq!(
+            result.idents,
+            vec![
+                Token::Identifier("ident1".to_owned()),
+                Token::Identifier("ident2".to_owned())
+            ]
+        );
     }
 
     #[test]

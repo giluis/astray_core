@@ -37,19 +37,19 @@ where
     }
 }
 
-pub trait Parsable<T, P = Self>
+pub trait Parsable<TToken, P = Self>
 where
-    T: ConsumableToken + Parsable<T>,
-    P: Parsable<T>,
+    TToken: ConsumableToken + Parsable<TToken>,
+    P: Parsable<TToken>,
 {
-    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+    fn parse(iter: &mut TokenIter<TToken>) -> Result<Self, ParseError<TToken>>
     where
         Self: Sized;
 
     fn parse_if_match<F: Fn(&P) -> bool>(
-        iter: &mut TokenIter<T>,
+        iter: &mut TokenIter<TToken>,
         _matches: F,
-    ) -> Result<Self, ParseError<T>>
+    ) -> Result<Self, ParseError<TToken>>
     where
         Self: Sized,
     {
@@ -60,6 +60,8 @@ where
         std::any::type_name::<Self>().to_string()
     }
 }
+
+
 
 pub trait Expectable<T>
 where
