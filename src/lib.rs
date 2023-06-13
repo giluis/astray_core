@@ -1,5 +1,6 @@
 #![feature(let_chains)]
 #![feature(more_qualified_paths)]
+#![feature(associated_type_defaults)]
 
 pub mod base_traits;
 pub mod iter;

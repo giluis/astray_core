@@ -2,15 +2,13 @@ use std::mem::MaybeUninit;
 
 use arr_macro::arr;
 
-use crate::{
-    base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter, ConsumableToken,
-};
+use crate::{base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter};
 
 impl<P1, P2, T> Parsable<T> for (P1, P2)
 where
     P1: Parsable<T>,
     P2: Parsable<T>,
-    T: ConsumableToken,
+    T: Parsable<T>,
 {
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
     where
@@ -25,7 +23,7 @@ where
     P1: Parsable<T>,
     P2: Parsable<T>,
     P3: Parsable<T>,
-    T: ConsumableToken,
+    T: Parsable<T>,
 {
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
     where
@@ -45,7 +43,7 @@ where
 //         impl<$($tuplll,)* T> Parsable<T> for ($($tuplll),*)
 //         where
 //             $($tuplll: Parsable<T>,)*
-//             T: ConsumableToken,
+//             T: Parsable<T>,
 //         {
 //             fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
 //             where
@@ -58,11 +56,12 @@ where
 //     () => ()
 // }
 
-impl<T, P> Parsable<T, P> for Box<P>
+impl<T, P> Parsable<T> for Box<P>
 where
-    P: Parsable<T>,
-    T: ConsumableToken,
+    P: Parsable<T, ApplyMatchTo = P>,
+    T: Parsable<T>,
 {
+    type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
     where
         Self: Sized,
@@ -70,22 +69,23 @@ where
         Ok(Box::new(P::parse(iter)?))
     }
 
-    fn parse_if_match<F: Fn(&P) -> bool>(
+    fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<T>,
         matches: F,
     ) -> Result<Self, ParseError<T>>
     where
         Self: Sized,
     {
-        Ok(Box::new(P::parse_if_match(iter, matches)?))
+        Ok(Box::new(iter.parse_if_match(matches)?))
     }
 }
 
-impl<T, P> Parsable<T, P> for Vec<P>
+impl<T, P> Parsable<T> for Vec<P>
 where
-    P: Parsable<T>,
-    T: ConsumableToken,
+    P: Parsable<T, ApplyMatchTo = P>,
+    T: Parsable<T>,
 {
+    type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
         let mut results = vec![];
         while let Ok(r) = P::parse(iter) {
@@ -96,17 +96,18 @@ where
 
     fn parse_if_match<F>(iter: &mut TokenIter<T>, matches: F) -> Result<Vec<P>, ParseError<T>>
     where
-        F: Fn(&P) -> bool,
+        F: Fn(&Self::ApplyMatchTo) -> bool,
     {
         Ok(iter.parse_while(matches))
     }
 }
 
-impl<T, P> Parsable<T, P> for Option<P>
+impl<T, P> Parsable<T> for Option<P>
 where
     P: Parsable<T>,
-    T: ConsumableToken,
+    T: Parsable<T>,
 {
+    type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
         let r = P::parse(iter);
         match r {
@@ -115,14 +116,14 @@ where
         }
     }
 
-    fn parse_if_match<F: Fn(&P) -> bool>(
+    fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<T>,
         matches: F,
     ) -> Result<Self, ParseError<T>>
     where
         Self: Sized,
     {
-        Self::parse(iter).map(|result| {
+        iter.parse().map(|result| {
             if let Some(ref inner) = result && matches(inner) {
                 result
             } else {
@@ -154,7 +155,7 @@ mod tests {
                 Token::Identifier(string) => string,
                 _ => unreachable!("Domain error: token returned by parse_if_match should be of the same variant as the token passed as argument"),
             };
-            let semi = <Option<Token> as Parsable<Token, Token>>::parse_if_match(iter, |tok| {
+            let semi = <Option<Token> as Parsable<Token>>::parse_if_match(iter, |tok| {
                 matches!(tok, Token::SemiColon)
             })?;
             Ok(TestStruct { ident, semi })
@@ -166,7 +167,8 @@ mod tests {
         idents: Vec<Token>,
     }
 
-    impl Parsable<Token, Token> for VecStruct {
+    impl Parsable<Token> for VecStruct {
+        type ApplyMatchTo = Token;
         fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
         where
             Self: Sized,
@@ -191,7 +193,8 @@ mod tests {
         ident: Box<Token>,
     }
 
-    impl Parsable<Token, Token> for BoxStruct {
+    impl Parsable<Token> for BoxStruct {
+        type ApplyMatchTo = Token;
         fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
         where
             Self: Sized,
@@ -212,6 +215,74 @@ mod tests {
         }
     }
 
+    #[test]
+    fn vec_of_tuples_arity2() {
+        let tokens = vec![t!(return), t!(litint 3), t!(return), t!(litint 3)];
+        let mut iter = TokenIter::new(tokens.clone());
+        let result: Vec<(Token, Token)> = iter.parse().unwrap();
+        assert_eq!(
+            result,
+            vec![
+                (
+                    tokens.get(0).unwrap().clone(),
+                    tokens.get(1).unwrap().clone()
+                ),
+                (
+                    tokens.get(2).unwrap().clone(),
+                    tokens.get(3).unwrap().clone()
+                )
+            ]
+        );
+
+        let tokens = vec![t!(return), t!(litint 3), t!(return)];
+        let mut iter = TokenIter::new(tokens.clone());
+        let result: Vec<(Token, Token)> = iter.parse().unwrap();
+        assert_eq!(
+            result,
+            vec![
+                (
+                    tokens.get(0).unwrap().clone(),
+                    tokens.get(1).unwrap().clone()
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn vec_of_tuples_arity3() {
+        let tokens = vec![t!(return), t!(litint 3), t!(return), t!(litint 3),t!(return), t!(litint 3)];
+        let mut iter = TokenIter::new(tokens.clone());
+        let result: Vec<(Token, Token, Token)> = iter.parse().unwrap();
+        assert_eq!(
+            result,
+            vec![
+                (
+                    tokens.get(0).unwrap().clone(),
+                    tokens.get(1).unwrap().clone(),
+                    tokens.get(2).unwrap().clone(),
+                ),
+                (
+                    tokens.get(3).unwrap().clone(),
+                    tokens.get(4).unwrap().clone(),
+                    tokens.get(5).unwrap().clone(),
+                )
+            ]
+        );
+
+        let tokens = vec![t!(return), t!(litint 3), t!(return), t!(litint 3),t!(return)];
+        let mut iter = TokenIter::new(tokens.clone());
+        let result: Vec<(Token, Token, Token)> = iter.parse().unwrap();
+        assert_eq!(
+            result,
+            vec![
+                (
+                    tokens.get(0).unwrap().clone(),
+                    tokens.get(1).unwrap().clone(),
+                    tokens.get(2).unwrap().clone(),
+                ),
+            ]
+        );
+    }
     #[test]
     fn box_ok() {
         struct Test1 {

@@ -1,8 +1,8 @@
-use crate::ConsumableToken;
+use crate::{ConsumableToken, Parsable};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseErrorType<T> 
-where T: ConsumableToken{
+where T: Parsable<T>{
     UnexpectedToken { expected: T, found: T },
     NoMoreTokens,
     UnmatchingToken { found: T, error_msg: Option<String>},
@@ -13,7 +13,7 @@ where T: ConsumableToken{
 // TODO: Refactor type_name
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError<T> 
-where T: ConsumableToken{
+where T: Parsable<T>{
     failed_at: usize,
     pub failure_type: ParseErrorType<T>,
     type_name: Option<String>,
@@ -21,7 +21,7 @@ where T: ConsumableToken{
 
 impl<T> ParseError<T>
 where
-    T: ConsumableToken,
+    T: Parsable<T>,
     
 {
 

@@ -9,7 +9,7 @@ pub struct TokenIter<Token> {
 
 impl<Token> TokenIter<Token>
 where
-    Token: ConsumableToken,
+    Token: Parsable<Token>,
 {
     pub fn new(tokens: Vec<Token>) -> TokenIter<Token> {
         TokenIter {
@@ -41,11 +41,10 @@ where
         self.try_do(|token_iter| P::parse(token_iter))
     }
 
-    pub fn parse_if_match<F, Q, P>(&mut self, matcher: F) -> Result<P, ParseError<Token>>
+    pub fn parse_if_match<F, P>(&mut self, matcher: F) -> Result<P, ParseError<Token>>
     where
-        Q: Parsable<Token>,
-        P: Parsable<Token, Q>,
-        F: Fn(&Q) -> bool,
+        P: Parsable<Token>,
+        F: Fn(&P::ApplyMatchTo) -> bool,
     {
         self.try_do(|token_iter| P::parse_if_match(token_iter, matcher))
     }

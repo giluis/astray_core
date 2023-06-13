@@ -1,4 +1,4 @@
-use crate::ConsumableToken;
+use crate::{ConsumableToken, Parsable, TokenIter, ParseError};
 
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct LiteralStringValue {
@@ -32,6 +32,8 @@ impl From<String> for IdentifierValue {
         IdentifierValue { value: s }
     }
 }
+
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
@@ -206,13 +208,33 @@ macro_rules! t {
     };
 }
 
-impl ConsumableToken for Token {
-    fn stateless_equals(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Token::LiteralString(_), Token::LiteralString(_)) => true,
-            (Token::LiteralInt(_), Token::LiteralInt(_)) => true,
-            (Token::Identifier(_), Token::Identifier(_)) => true,
-            _ => self == other,
+impl Parsable<Token> for Token
+{
+    fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
+    where
+        Self: Sized,
+    {
+        match iter.consume() {
+            Some(token) => Ok(token),
+            None => Err(ParseError::no_more_tokens(iter.current))
+        }
+    }
+
+    fn parse_if_match<F: Fn(&Token) -> bool>(
+        iter: &mut TokenIter<Token>,
+        matches: F,
+    ) -> Result<Self, ParseError<Token>>
+    where
+        Self: Sized,
+    {
+        match iter.consume() {
+            Some(ref found) if matches(found) => Ok(found.clone()),
+            Some(ref found) => Err(ParseError::unmatching_token(
+                iter.current,
+                "Failed to expected token not found".to_string(),
+                found.clone(),
+            )),
+            _ => Err(ParseError::no_more_tokens(iter.current)),
         }
     }
 }
