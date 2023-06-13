@@ -55,11 +55,7 @@ where
         F: Fn(&Q) -> bool,
         Q: Parsable<Token>,
     {
-        let mut result = vec![];
-        while let Ok(found) = self.parse::<Q>() && keep_going(&found){
-            result.push(found)
-        };
-        result.into_iter().collect()
+        todo!()
     }
 
     pub fn consume(&mut self) -> Option<Token> {

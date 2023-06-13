@@ -94,11 +94,24 @@ where
         Ok(results)
     }
 
+    // TODO: Test Vector parse if match
     fn parse_if_match<F>(iter: &mut TokenIter<T>, matches: F) -> Result<Vec<P>, ParseError<T>>
     where
         F: Fn(&Self::ApplyMatchTo) -> bool,
     {
-        Ok(iter.parse_while(matches))
+        let mut result = vec![];
+        while let Ok(element) = iter.try_do(|token_iter| {
+            let result = Self::ApplyMatchTo::parse(token_iter);
+            match result {
+                Ok(aa) if matches(&aa) => Ok(aa),
+                // TODO: refactor this so that found_but_unmatching is used
+                Ok(_found_but_unmatching) =>  Err(ParseError::parsed_but_unmatching(token_iter.current)),
+                Err(err) => Err(ParseError::from_conjunct_error("SOmetype".to_string(), err))
+            }
+        }) {
+            result.push(element)
+        };
+        Ok(result)
     }
 }
 
@@ -214,6 +227,9 @@ mod tests {
             Ok(BoxStruct { ident })
         }
     }
+
+
+
 
     #[test]
     fn vec_of_tuples_arity2() {

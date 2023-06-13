@@ -1,6 +1,6 @@
 [package]
 name = "astray_core"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2021"
 license = "MIT"
 description = "Core functionality of the astray macro"
