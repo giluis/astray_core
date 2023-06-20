@@ -130,7 +130,7 @@ where
                 Ok(_found_but_unmatching) => {
                     Err(ParseError::parsed_but_unmatching(token_iter.current))
                 }
-                Err(err) => Err(ParseError::from_conjunct_error(Self::identifier(),err)),
+                Err(err) => Err(ParseError::from_conjunct_error(Self::identifier(), err)),
             }
         }) {
             result.push(element)
@@ -141,13 +141,13 @@ where
 
 impl<T, P> Parsable<T> for Option<P>
 where
-    P: Parsable<T>,
+    P: Parsable<T, ApplyMatchTo = P>,
     T: Parsable<T>,
     T: Clone,
 {
     type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
-        let r = P::parse(iter);
+        let r = iter.parse();
         match r {
             Ok(r) => Ok(Some(r)),
             Err(_) => Ok(None),
@@ -161,13 +161,11 @@ where
     where
         Self: Sized,
     {
-        iter.parse().map(|result| {
-            if let Some(ref inner) = result && matches(inner) {
-                result
-            } else {
-                None
-            }
-        })
+        let r: Result<Self::ApplyMatchTo, _> = iter.parse_if_match(matches);
+        match r {
+            Ok(r) => Ok(Some(r)),
+            Err(_) => Ok(None),
+        }
     }
 }
 
@@ -407,6 +405,60 @@ mod tests {
 
         let result = VecStruct::parse(&mut TokenIter::new(tokens)).expect("Should be ok");
         assert_eq!(result.idents, vec![]);
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    struct ReturnStatement {
+        k_return: Option<Token>,
+        ident: Token,
+        semi: Option<Token>,
+    }
+
+    impl Parsable<Token> for ReturnStatement {
+        fn parse(iter: &mut TokenIter<Token>) -> Result<ReturnStatement, ParseError<Token>> {
+            let k_return = iter.parse_if_match(|input| matches!(input, Token::KReturn))?;
+            let ident = iter.parse_if_match(|input| matches!(input, Token::Identifier(_)))?;
+            let semi = iter.parse_if_match(|input| matches!(input, Token::SemiColon))?;
+            Ok(ReturnStatement {
+                k_return,
+                ident,
+                semi,
+            })
+        }
+    }
+
+    #[test]
+    fn test1() {
+        let tokens = vec![t!(return), t!(ident "some_ident"), t!(;)];
+        let expected = ReturnStatement {
+            k_return: Some(t!(return)),
+            ident: t!(ident "some_ident"),
+            semi: Some(t!(;)),
+        };
+
+        let result = ReturnStatement::parse(&mut TokenIter::new(tokens));
+        assert_eq!(Ok(expected), result);
+
+        let tokens = vec![t!(ident "some_ident"), t!(;)];
+        let expected = ReturnStatement {
+            k_return: None,
+            ident: t!(ident "some_ident"),
+            semi: Some(t!(;)),
+        };
+
+        let result = ReturnStatement::parse(&mut TokenIter::new(tokens));
+        assert_eq!(Ok(expected), result);
+
+        let tokens = vec![t!(return), t!(ident "some_ident")];
+
+        let expected = ReturnStatement {
+            k_return: Some(t!(return)),
+            ident: t!(ident "some_ident"),
+            semi: None,
+        };
+
+        let result = ReturnStatement::parse(&mut TokenIter::new(tokens));
+        assert_eq!(Ok(expected), result);
     }
 
     #[test]
