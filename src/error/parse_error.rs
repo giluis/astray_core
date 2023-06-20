@@ -4,6 +4,7 @@ use crate::{ConsumableToken, Parsable};
 pub enum ParseErrorType<T>
 where
     T: Parsable<T>,
+    T: Clone
 {
     UnexpectedToken { expected: T, found: T },
     NoMoreTokens,
@@ -18,20 +19,22 @@ where
 pub struct ParseError<T>
 where
     T: Parsable<T>,
+    T: Clone
 {
     failed_at: usize,
     pub failure_type: ParseErrorType<T>,
-    type_name: Option<String>,
+    type_name: Option<& 'static str>,
 }
 
 impl<T> ParseError<T>
 where
     T: Parsable<T>,
+    T: Clone
 {
     pub fn new(
         failed_at: usize,
         failure_type: ParseErrorType<T>,
-        type_name: Option<String>,
+        type_name: Option<&'static str>,
     ) -> Self {
         Self {
             failed_at,
@@ -39,7 +42,8 @@ where
             type_name,
         }
     }
-    pub fn from_conjunct_error(type_name: String, other: ParseError<T>) -> Self {
+
+    pub fn from_conjunct_error(type_name: &'static str, other: ParseError<T>) -> Self {
         ParseError {
             failed_at: other.failed_at,
             failure_type: ParseErrorType::ConjunctBranchParsingFailure(Box::new(other)),
@@ -71,15 +75,15 @@ where
         }
     }
 
-    pub fn from_disjunct_errors(
-        type_name: String,
+    pub fn from_disjunct_errors<P>(
         failed_at: usize,
         branches: Vec<ParseError<T>>,
-    ) -> ParseError<T> {
+    ) -> ParseError<T> 
+    where P: Parsable<T>{
         ParseError {
             failed_at,
             failure_type: ParseErrorType::DisjunctBranchParsingFailure(branches),
-            type_name: Some(type_name),
+            type_name: Some(P::identifier())
         }
     }
 

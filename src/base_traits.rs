@@ -37,10 +37,11 @@ pub trait ConsumableToken: Clone {
 //     }
 // }
 
-pub trait Parsable<TToken>: Clone
+pub trait Parsable<TToken>
 where
     TToken: Parsable<TToken>,
     Self: Sized,
+    TToken: Clone
 {
     type ApplyMatchTo: Parsable<TToken> = Self;
 
@@ -48,18 +49,20 @@ where
 
     fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<TToken>,
-        _matches: F,
+        matches: F,
     ) -> Result<Self, ParseError<TToken>>
     where
-        Self: Sized,
-    {
-        todo!()
-    }
+        Self: Sized {
+            todo!();
 
-    fn identifier() -> String {
-        std::any::type_name::<Self>().to_string()
+        }
+    
+
+    fn identifier() -> &'static str {
+        std::any::type_name::<Self>()
     }
 }
+
 
 
 

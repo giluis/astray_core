@@ -26,7 +26,7 @@ dependencies = [
 
 [[package]]
 name = "astray_core"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "arr_macro",
  "either",

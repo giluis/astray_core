@@ -9,6 +9,7 @@ where
     P1: Parsable<T>,
     P2: Parsable<T>,
     T: Parsable<T>,
+    T: Clone,
 {
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
     where
@@ -24,6 +25,7 @@ where
     P2: Parsable<T>,
     P3: Parsable<T>,
     T: Parsable<T>,
+    T: Clone,
 {
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
     where
@@ -35,6 +37,24 @@ where
             iter.parse::<P3>()?,
         ))
     }
+
+    fn parse_if_match<F: Fn(&Self) -> bool>(
+        iter: &mut TokenIter<T>,
+        matches: F,
+    ) -> Result<Self, ParseError<T>>
+    where
+        Self: Sized,
+    {
+        iter.try_do(|token_iter| {
+            let result = Self::parse(token_iter)?;
+            if matches(&result) {
+                Ok(result)
+            } else {
+                // TODO: Error messages
+                Err(ParseError::parsed_but_unmatching(token_iter.current))
+            }
+        })
+    }
 }
 
 // #[macro_export]
@@ -44,6 +64,7 @@ where
 //         where
 //             $($tuplll: Parsable<T>,)*
 //             T: Parsable<T>,
+//             T: Clone,
 //         {
 //             fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
 //             where
@@ -60,6 +81,7 @@ impl<T, P> Parsable<T> for Box<P>
 where
     P: Parsable<T, ApplyMatchTo = P>,
     T: Parsable<T>,
+    T: Clone,
 {
     type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
@@ -84,6 +106,7 @@ impl<T, P> Parsable<T> for Vec<P>
 where
     P: Parsable<T, ApplyMatchTo = P>,
     T: Parsable<T>,
+    T: Clone,
 {
     type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
@@ -94,7 +117,6 @@ where
         Ok(results)
     }
 
-    // TODO: Test Vector parse if match
     fn parse_if_match<F>(iter: &mut TokenIter<T>, matches: F) -> Result<Vec<P>, ParseError<T>>
     where
         F: Fn(&Self::ApplyMatchTo) -> bool,
@@ -105,12 +127,14 @@ where
             match result {
                 Ok(aa) if matches(&aa) => Ok(aa),
                 // TODO: refactor this so that found_but_unmatching is used
-                Ok(_found_but_unmatching) =>  Err(ParseError::parsed_but_unmatching(token_iter.current)),
-                Err(err) => Err(ParseError::from_conjunct_error("SOmetype".to_string(), err))
+                Ok(_found_but_unmatching) => {
+                    Err(ParseError::parsed_but_unmatching(token_iter.current))
+                }
+                Err(err) => Err(ParseError::from_conjunct_error(Self::identifier(),err)),
             }
         }) {
             result.push(element)
-        };
+        }
         Ok(result)
     }
 }
@@ -119,6 +143,7 @@ impl<T, P> Parsable<T> for Option<P>
 where
     P: Parsable<T>,
     T: Parsable<T>,
+    T: Clone,
 {
     type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
@@ -228,9 +253,6 @@ mod tests {
         }
     }
 
-
-
-
     #[test]
     fn vec_of_tuples_arity2() {
         let tokens = vec![t!(return), t!(litint 3), t!(return), t!(litint 3)];
@@ -255,18 +277,23 @@ mod tests {
         let result: Vec<(Token, Token)> = iter.parse().unwrap();
         assert_eq!(
             result,
-            vec![
-                (
-                    tokens.get(0).unwrap().clone(),
-                    tokens.get(1).unwrap().clone()
-                ),
-            ]
+            vec![(
+                tokens.get(0).unwrap().clone(),
+                tokens.get(1).unwrap().clone()
+            ),]
         );
     }
 
     #[test]
     fn vec_of_tuples_arity3() {
-        let tokens = vec![t!(return), t!(litint 3), t!(return), t!(litint 3),t!(return), t!(litint 3)];
+        let tokens = vec![
+            t!(return),
+            t!(litint 3),
+            t!(return),
+            t!(litint 3),
+            t!(return),
+            t!(litint 3),
+        ];
         let mut iter = TokenIter::new(tokens.clone());
         let result: Vec<(Token, Token, Token)> = iter.parse().unwrap();
         assert_eq!(
@@ -285,18 +312,22 @@ mod tests {
             ]
         );
 
-        let tokens = vec![t!(return), t!(litint 3), t!(return), t!(litint 3),t!(return)];
+        let tokens = vec![
+            t!(return),
+            t!(litint 3),
+            t!(return),
+            t!(litint 3),
+            t!(return),
+        ];
         let mut iter = TokenIter::new(tokens.clone());
         let result: Vec<(Token, Token, Token)> = iter.parse().unwrap();
         assert_eq!(
             result,
-            vec![
-                (
-                    tokens.get(0).unwrap().clone(),
-                    tokens.get(1).unwrap().clone(),
-                    tokens.get(2).unwrap().clone(),
-                ),
-            ]
+            vec![(
+                tokens.get(0).unwrap().clone(),
+                tokens.get(1).unwrap().clone(),
+                tokens.get(2).unwrap().clone(),
+            ),]
         );
     }
     #[test]

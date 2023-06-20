@@ -10,6 +10,7 @@ pub struct TokenIter<Token> {
 impl<Token> TokenIter<Token>
 where
     Token: Parsable<Token>,
+    Token: Clone
 {
     pub fn new(tokens: Vec<Token>) -> TokenIter<Token> {
         TokenIter {
