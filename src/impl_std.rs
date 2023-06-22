@@ -168,6 +168,18 @@ where
         }
     }
 }
+pub trait IfOk<T, E> {
+    fn if_ok(self, value: T) -> Result<T, E>;
+}
+
+impl<P, T, E> IfOk<T, E> for Result<P, E> {
+    fn if_ok(self, value: T) -> Result<T, E> {
+        match self {
+            Ok(_) => Ok(value),
+            Err(err) => Err(err),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
