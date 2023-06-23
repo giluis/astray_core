@@ -4,7 +4,7 @@ use arr_macro::arr;
 
 use crate::{base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter};
 
-impl<P1, P2, T> Parsable<T> for (P1, P2)
+impl<'a, P1, P2, T> Parsable<T> for (P1, P2)
 where
     P1: Parsable<T>,
     P2: Parsable<T>,
@@ -16,6 +16,24 @@ where
         Self: Sized,
     {
         Ok((iter.parse()?, iter.parse()?))
+    }
+
+    fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
+        iter: &mut TokenIter<T>,
+        matches: F,
+    ) -> Result<Self, ParseError<T>>
+    where
+        Self: Sized,
+    {
+        iter.try_do(|token_iter| {
+            let result = Self::parse(token_iter)?;
+            if matches(&result) {
+                Ok(result)
+            } else {
+                // TODO: Error messages
+                Err(ParseError::parsed_but_unmatching(token_iter.current))
+            }
+        })
     }
 }
 

@@ -53,7 +53,7 @@ where
     ) -> Result<Self, ParseError<TToken>>
     where
         Self: Sized {
-            todo!();
+            todo!("parse_if_match not yet implemented for {:?}", Self::identifier());
 
         }
     
@@ -62,16 +62,3 @@ where
         std::any::type_name::<Self>()
     }
 }
-
-
-
-
-pub trait Expectable<T>
-where
-    T: ConsumableToken,
-{
-    fn identifier() -> String {
-        std::any::type_name::<Self>().to_string()
-    }
-}
-
