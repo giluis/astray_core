@@ -1,4 +1,6 @@
-use crate::{Parsable, TokenIter, ParseError};
+use std::cmp::max;
+
+use crate::{ConsumableToken, Parsable, ParseError, TokenIter};
 
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct LiteralStringValue {
@@ -32,8 +34,6 @@ impl From<String> for IdentifierValue {
         IdentifierValue { value: s }
     }
 }
-
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
@@ -80,9 +80,7 @@ impl Token {
         };
         (token, input.len())
     }
-
 }
-
 
 #[macro_export]
 macro_rules! t {
@@ -208,15 +206,16 @@ macro_rules! t {
     };
 }
 
-impl Parsable<Token> for Token
-{
+impl ConsumableToken for Token {}
+
+impl Parsable<Token> for Token {
     fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
     where
         Self: Sized,
     {
         match iter.consume() {
             Some(token) => Ok(token),
-            None => Err(ParseError::no_more_tokens(iter.current))
+            None => Err(ParseError::no_more_tokens(iter.current)),
         }
     }
 
@@ -227,14 +226,23 @@ impl Parsable<Token> for Token
     where
         Self: Sized,
     {
-        match iter.consume() {
+        // TODO: find a way to express this that doesn't need comparison:
+        // this introduces extra instructions every time a token is parsed
+        iter.try_do(|token_iter| match token_iter.consume() {
             Some(ref found) if matches(found) => Ok(found.clone()),
-            Some(ref found) => Err(ParseError::unmatching_token(
-                iter.current,
-                "Failed to expected token not found".to_string(),
-                found.clone(),
+            Some(ref found) => Err(ParseError::parsed_but_unmatching::<Token>(
+                if token_iter.current == 0 {
+                    token_iter.current
+                } else {
+                    token_iter.current - 1
+                },
+                found,
             )),
-            _ => Err(ParseError::no_more_tokens(iter.current)),
-        }
+            _ => Err(ParseError::no_more_tokens(if token_iter.current == 0 {
+                token_iter.current
+            } else {
+                token_iter.current - 1
+            })),
+        })
     }
 }

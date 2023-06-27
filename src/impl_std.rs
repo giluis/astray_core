@@ -1,15 +1,11 @@
-use std::mem::MaybeUninit;
 
-use arr_macro::arr;
+use crate::{base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter, ConsumableToken};
 
-use crate::{base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter};
-
-impl<'a, P1, P2, T> Parsable<T> for (P1, P2)
+impl<P1, P2, T> Parsable<T> for (P1, P2)
 where
     P1: Parsable<T>,
     P2: Parsable<T>,
-    T: Parsable<T>,
-    T: Clone,
+    T: ConsumableToken,
 {
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
     where
@@ -31,7 +27,7 @@ where
                 Ok(result)
             } else {
                 // TODO: Error messages
-                Err(ParseError::parsed_but_unmatching(token_iter.current))
+                Err(ParseError::parsed_but_unmatching(token_iter.current, &result))
             }
         })
     }
@@ -42,8 +38,7 @@ where
     P1: Parsable<T>,
     P2: Parsable<T>,
     P3: Parsable<T>,
-    T: Parsable<T>,
-    T: Clone,
+    T: ConsumableToken,
 {
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
     where
@@ -69,37 +64,40 @@ where
                 Ok(result)
             } else {
                 // TODO: Error messages
-                Err(ParseError::parsed_but_unmatching(token_iter.current))
+                Err(ParseError::parsed_but_unmatching(token_iter.current, &result))
             }
         })
     }
 }
 
-// #[macro_export]
-// macro_rules! impl_tuple {
-//     ($($tuplll:ty),*) => {
-//         impl<$($tuplll,)* T> Parsable<T> for ($($tuplll),*)
-//         where
-//             $($tuplll: Parsable<T>,)*
-//             T: Parsable<T>,
-//             T: Clone,
-//         {
-//             fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
-//             where
-//                 Self: Sized,
-//             {
-//                 Ok(($(iter.parse::<$tuplll>()?,)*))
-//             }
-//         }
-//     };
-//     () => ()
-// }
+impl<P1, P2, P3, P4, T> Parsable<T> for (P1, P2, P3, P4)
+where
+    P1: Parsable<T>,
+    P2: Parsable<T>,
+    P3: Parsable<T>,
+    P4: Parsable<T>,
+    T: ConsumableToken,
+{
+    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+    where
+        Self: Sized,
+    {
+        Ok((
+            iter.parse::<P1>()?,
+            iter.parse::<P2>()?,
+            iter.parse::<P3>()?,
+            iter.parse::<P4>()?,
+        ))
+    }
+}
+
+
+// TODO: macro for tuple implementation
 
 impl<T, P> Parsable<T> for Box<P>
 where
     P: Parsable<T, ApplyMatchTo = P>,
-    T: Parsable<T>,
-    T: Clone,
+    T: ConsumableToken,
 {
     type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
@@ -123,8 +121,7 @@ where
 impl<T, P> Parsable<T> for Vec<P>
 where
     P: Parsable<T, ApplyMatchTo = P>,
-    T: Parsable<T>,
-    T: Clone,
+    T: ConsumableToken,
 {
     type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
@@ -145,8 +142,8 @@ where
             match result {
                 Ok(aa) if matches(&aa) => Ok(aa),
                 // TODO: refactor this so that found_but_unmatching is used
-                Ok(_found_but_unmatching) => {
-                    Err(ParseError::parsed_but_unmatching(token_iter.current))
+                Ok(found_but_unmatching) => {
+                    Err(ParseError::parsed_but_unmatching::<Self::ApplyMatchTo>(token_iter.current, &found_but_unmatching))
                 }
                 Err(err) => Err(ParseError::from_conjunct_error(Self::identifier(), err)),
             }
@@ -160,8 +157,7 @@ where
 impl<T, P> Parsable<T> for Option<P>
 where
     P: Parsable<T, ApplyMatchTo = P>,
-    T: Parsable<T>,
-    T: Clone,
+    T: ConsumableToken,
 {
     type ApplyMatchTo = P;
     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
@@ -360,10 +356,6 @@ mod tests {
     }
     #[test]
     fn box_ok() {
-        struct Test1 {
-            ident: Token,
-        }
-
         let tokens = vec![t!(ident "hello")];
         let result = BoxStruct::parse(&mut TokenIter::new(tokens)).unwrap();
         assert_eq!(

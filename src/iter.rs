@@ -9,8 +9,7 @@ pub struct TokenIter<Token> {
 
 impl<Token> TokenIter<Token>
 where
-    Token: Parsable<Token>,
-    Token: Clone
+    Token: ConsumableToken,
 {
     pub fn new(tokens: Vec<Token>) -> TokenIter<Token> {
         TokenIter {
@@ -50,13 +49,14 @@ where
         self.try_do(|token_iter| P::parse_if_match(token_iter, matcher))
     }
 
-    pub fn parse_while<I, F, Q>(&mut self, keep_going: F) -> I
+    pub fn parse_while<I, F, Q>(&mut self, _keep_going: F) -> I
     where
         I: FromIterator<Q>,
         F: Fn(&Q) -> bool,
         Q: Parsable<Token>,
     {
-        todo!()
+        // TODO: implement this
+        todo!("Parse while not yet implemented")
     }
 
     pub fn consume(&mut self) -> Option<Token> {
@@ -81,7 +81,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::test_common::TestStruct;
-    use crate::{t, Parsable, ParseError, Token, TokenIter, ParseErrorType};
+    use crate::{t, Parsable, ParseError, Token, TokenIter};
 
     #[test]
     fn parse_if_match_match_enum_token() {
@@ -97,7 +97,7 @@ mod tests {
         assert_eq!(result, Ok(Token::Identifier("Some identifier".to_string())));
 
         let result: Result<Token, _> = iter.parse_if_match(|t| matches!(t, Token::Identifier(_)));
-        assert_eq!(result, Err(ParseError::no_more_tokens(2)));
+        assert_eq!(result, Err(ParseError::no_more_tokens(1)));
 
         let mut iter: TokenIter<Token> =
             TokenIter::new(vec![Token::Identifier("Some identifier".to_string())]);
@@ -112,16 +112,8 @@ mod tests {
         let tokens = vec![t!(litint 32)];
         let mut iter = TokenIter::new(tokens);
         let result: Result<Token, _> = iter.parse_if_match(|tok| matches!(tok, t!(return)));
-        assert!(matches!(
-            result,
-            Err(ParseError {
-                failure_type: ParseErrorType::UnmatchingToken {
-                    found: t!(litint 32),
-                    ..
-                },
-                ..
-            })
-        ));
+        let expected = Err(ParseError::parsed_but_unmatching(iter.current, &t!(litint 32)));
+        assert_eq!(expected, result);
         assert!(iter.current == 0);
     }
 

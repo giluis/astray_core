@@ -1,8 +1,11 @@
 use crate::{ParseError, TokenIter};
 
-pub trait ConsumableToken: Clone {
-    fn stateless_equals(&self, other: &Self) -> bool;
+
+pub trait ConsumableToken: Clone+ std::fmt::Debug + Parsable<Self>{
+
 }
+
+
 
 // impl<T> Parsable<T> for T
 // where
@@ -37,16 +40,18 @@ pub trait ConsumableToken: Clone {
 //     }
 // }
 
-pub trait Parsable<TToken>
+pub trait Parsable<TToken>: std::fmt::Debug
 where
     TToken: Parsable<TToken>,
     Self: Sized,
-    TToken: Clone
+    TToken: ConsumableToken
+
 {
     type ApplyMatchTo: Parsable<TToken> = Self;
 
     fn parse(iter: &mut TokenIter<TToken>) -> Result<Self, ParseError<TToken>>;
 
+    #[allow(unused_variables)]
     fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<TToken>,
         matches: F,
@@ -54,7 +59,6 @@ where
     where
         Self: Sized {
             todo!("parse_if_match not yet implemented for {:?}", Self::identifier());
-
         }
     
 
