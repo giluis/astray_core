@@ -5,22 +5,11 @@ pub enum ParseErrorType<T>
 where
     T: ConsumableToken,
 {
-    UnexpectedToken {
-        expected: T,
-        found: T,
-    },
+    UnexpectedToken { expected: T, found: T },
     NoMoreTokens,
-    ParsedButUnmatching {
-        err_msg: String,
-    }, // TODO: specify extra fields here which might be useful
-    ConjunctBranchParsingFailure {
-        type_name: &'static str,
-        err_source: Box<ParseError<T>>,
-    },
-    DisjunctBranchParsingFailure {
-        type_name: &'static str,
-        err_source: Vec<ParseError<T>>,
-    },
+    ParsedButUnmatching { err_msg: String }, // TODO: specify extra fields here which might be useful
+    ConjunctBranchParsingFailure { err_source: Box<ParseError<T>> },
+    DisjunctBranchParsingFailure { err_source: Vec<ParseError<T>> },
 }
 
 // TODO: Refactor type_name
@@ -29,6 +18,7 @@ pub struct ParseError<T>
 where
     T: ConsumableToken,
 {
+    type_name: &'static str,
     failed_at: usize,
     pub failure_type: ParseErrorType<T>,
 }
@@ -37,66 +27,69 @@ impl<T> ParseError<T>
 where
     T: ConsumableToken,
 {
-    pub fn new(
-        failed_at: usize,
-        failure_type: ParseErrorType<T>,
-    ) -> Self {
+    pub fn new<P>(failed_at: usize, failure_type: ParseErrorType<T>) -> Self
+    where
+        P: Parsable<T>,
+    {
         Self {
+            type_name: P::identifier(),
             failed_at,
             failure_type,
         }
     }
 
-    pub fn from_conjunct_error(type_name: &'static str, other: ParseError<T>) -> Self {
-        ParseError {
-            failed_at: other.failed_at,
-            failure_type: ParseErrorType::ConjunctBranchParsingFailure {
-                type_name,
-                err_source: Box::new(other),
-            },
-        }
-    }
-
-    pub fn parsed_but_unmatching<P>(failed_at: usize, result: &P) -> Self
+    pub fn parsed_but_unmatching<P>(
+        failed_at: usize,
+        result: &P,
+        pattern: Option<&'static str>,
+    ) -> Self
     where
         P: Parsable<T>,
     {
-        // TODO: Add pattern information here
-        let err_msg = format!("Parsed {:?}, but it did not match pattern", result);
-        ParseError {
-            failed_at,
-            failure_type: ParseErrorType::ParsedButUnmatching { err_msg },
-        }
+        let pattern = pattern.unwrap_or("(pattern not provided by user)");
+        let type_name = <P as Parsable<T>>::identifier();
+        let err_msg = format!(
+            "Parsed {:?}: {type_name}, but it did not match pattern '{pattern}'",
+            result
+        );
+        ParseError::new::<P>(failed_at, ParseErrorType::ParsedButUnmatching { err_msg })
     }
 
-    pub fn no_more_tokens(failed_at: usize) -> Self {
-        ParseError {
-            failed_at,
-            failure_type: crate::ParseErrorType::NoMoreTokens,
-        }
-    }
-
-    pub fn from_disjunct_errors(
-        failed_at: usize,
-        err_source: Vec<ParseError<T>>,
-        type_name: &'static str,
-    ) -> ParseError<T>
+    pub fn no_more_tokens<P>(failed_at: usize) -> Self
+    where
+        P: Parsable<T>,
     {
-        ParseError {
-            failed_at,
-            failure_type: ParseErrorType::DisjunctBranchParsingFailure {
-                type_name,
-                err_source,
-            },
-        }
+        ParseError::new::<P>(failed_at, ParseErrorType::NoMoreTokens)
     }
 
-    pub fn to_string(&self, identation_level: usize) -> String {
-        let tabs = "\t".repeat(identation_level);
+    pub fn from_conjunct_error<P>(other: ParseError<T>) -> Self
+    where
+        P: Parsable<T>,
+    {
+        ParseError::new::<P>(
+            other.failed_at,
+            ParseErrorType::ConjunctBranchParsingFailure {
+                err_source: Box::new(other),
+            },
+        )
+    }
+
+    pub fn from_disjunct_errors<P>(failed_at: usize, err_source: Vec<ParseError<T>>) -> Self
+    where
+        P: Parsable<T>,
+    {
+        ParseError::new::<P>(
+            failed_at,
+            ParseErrorType::DisjunctBranchParsingFailure { err_source },
+        )
+    }
+
+    pub fn to_string(&self, indentation_level: usize) -> String {
+        let tabs = "\t".repeat(indentation_level);
         match &self.failure_type {
             ParseErrorType::UnexpectedToken { expected, found } => {
-                let more_tabs = "\t".repeat(identation_level + 1);
-                format!("{tabs}Unexpected Token Erorr\n{more_tabs}Expected {:?}\n{more_tabs}Found {:?}\n", expected, found)
+                let more_tabs = "\t".repeat(indentation_level + 1);
+                format!("{tabs}Unexpected Token Error\n{more_tabs}Expected {:?}\n{more_tabs}Found {:?}\n", expected, found)
             }
             ParseErrorType::NoMoreTokens => {
                 format!("{tabs}Ran out of tokens\n")
@@ -104,23 +97,20 @@ where
             ParseErrorType::ParsedButUnmatching { err_msg } => {
                 format!("{tabs}{err_msg}")
             }
-            ParseErrorType::ConjunctBranchParsingFailure {
-                type_name,
-                err_source,
-            } => {
-                let err_source_str = err_source.to_string(identation_level + 1);
-                format!("{tabs}Failed to parse {type_name}:\n{err_source_str}")
+            ParseErrorType::ConjunctBranchParsingFailure { err_source } => {
+                let err_source_str = err_source.to_string(indentation_level + 1);
+                format!(
+                    "{tabs}Failed to parse {}:\n{err_source_str}",
+                    self.type_name
+                )
             }
-            ParseErrorType::DisjunctBranchParsingFailure {
-                type_name,
-                err_source,
-            } => {
+            ParseErrorType::DisjunctBranchParsingFailure { err_source } => {
                 let errors = err_source
                     .iter()
-                    .map(|e| e.to_string(identation_level + 1))
+                    .map(|e| e.to_string(indentation_level + 1))
                     .reduce(|accum, curr| accum + "\n" + &curr)
                     .expect("Enums without variants cannot implement Parsable");
-                format!("{tabs}Failed to parse {type_name}:\n{errors}")
+                format!("{tabs}Failed to parse {}:\n{errors}", self.type_name)
             }
         }
     }
@@ -128,31 +118,40 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{t, ParseError};
     use crate::token::Token;
+    use crate::{t, Parsable, ParseError};
 
     #[test]
     fn to_string() {
-        let result = ParseError::from_conjunct_error(
-            "ConjunctType",
-            ParseError::from_disjunct_errors(
+        let pattern1 = "Token::KwReturn";
+        let pattern2 = "Token::LiteralInt(_)";
+        let result =
+            ParseError::from_conjunct_error::<Token>(
+                ParseError::from_disjunct_errors::<Token>(
                 1,
                 vec![
-                    ParseError::from_conjunct_error(
-                        "SubType1",
-                        ParseError::parsed_but_unmatching(1, &t!(return)),
+                    ParseError::parsed_but_unmatching::<Token>(
+                        1,
+                        &t!(return),
+                        Some(pattern1),
                     ),
-                    ParseError::parsed_but_unmatching(1, &t!(litint 3)),
+                    ParseError::parsed_but_unmatching::<Token>(
+                        1,
+                        &t!(litint 3),
+                        Some(pattern2),
+                    ),
                 ],
-                "DisjunctType",
-            ),
-        ).to_string(0);
-        let expected = format!("Failed to parse ConjunctType:
-\tFailed to parse DisjunctType:
-\t\tFailed to parse SubType1:
-\t\t\tParsed {:?}, but it did not match pattern
-\t\tParsed {:?}, but it did not match pattern", t!(return), t!(litint 3));
-        println!("{result}");
+            ))
+            .to_string(0);
+        let expected_identifier = <Token as Parsable<Token>>::identifier();
+        let expected = format!(
+            "Failed to parse {expected_identifier}:
+\tFailed to parse {expected_identifier}:
+\t\tParsed {:?}: {expected_identifier}, but it did not match pattern '{pattern1}'
+\t\tParsed {:?}: {expected_identifier}, but it did not match pattern '{pattern2}'",
+            t!(return),
+            t!(litint 3),
+        );
         assert_eq!(expected, result)
     }
 }

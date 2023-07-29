@@ -17,6 +17,7 @@ where
     fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<T>,
         matches: F,
+        pattern: Option<&'static str>
     ) -> Result<Self, ParseError<T>>
     where
         Self: Sized,
@@ -27,7 +28,7 @@ where
                 Ok(result)
             } else {
                 // TODO: Error messages
-                Err(ParseError::parsed_but_unmatching(token_iter.current, &result))
+                Err(ParseError::parsed_but_unmatching::<Self>(token_iter.current, &result,pattern))
             }
         })
     }
@@ -54,6 +55,7 @@ where
     fn parse_if_match<F: Fn(&Self) -> bool>(
         iter: &mut TokenIter<T>,
         matches: F,
+        pattern: Option<&'static str>
     ) -> Result<Self, ParseError<T>>
     where
         Self: Sized,
@@ -64,7 +66,7 @@ where
                 Ok(result)
             } else {
                 // TODO: Error messages
-                Err(ParseError::parsed_but_unmatching(token_iter.current, &result))
+                Err(ParseError::parsed_but_unmatching::<Self>(token_iter.current, &result,pattern))
             }
         })
     }
@@ -110,11 +112,12 @@ where
     fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<T>,
         matches: F,
+        pattern: Option<&'static str>
     ) -> Result<Self, ParseError<T>>
     where
         Self: Sized,
     {
-        Ok(Box::new(iter.parse_if_match(matches)?))
+        Ok(Box::new(iter.parse_if_match(matches, None)?))
     }
 }
 
@@ -132,7 +135,7 @@ where
         Ok(results)
     }
 
-    fn parse_if_match<F>(iter: &mut TokenIter<T>, matches: F) -> Result<Vec<P>, ParseError<T>>
+    fn parse_if_match<F>(iter: &mut TokenIter<T>, matches: F, pattern: Option<&'static str>) -> Result<Vec<P>, ParseError<T>>
     where
         F: Fn(&Self::ApplyMatchTo) -> bool,
     {
@@ -141,11 +144,10 @@ where
             let result = Self::ApplyMatchTo::parse(token_iter);
             match result {
                 Ok(aa) if matches(&aa) => Ok(aa),
-                // TODO: refactor this so that found_but_unmatching is used
                 Ok(found_but_unmatching) => {
-                    Err(ParseError::parsed_but_unmatching::<Self::ApplyMatchTo>(token_iter.current, &found_but_unmatching))
+                    Err(ParseError::parsed_but_unmatching::<Self::ApplyMatchTo>(token_iter.current, &found_but_unmatching,pattern))
                 }
-                Err(err) => Err(ParseError::from_conjunct_error(Self::identifier(), err)),
+                Err(err) => Err(ParseError::from_conjunct_error::<Self::ApplyMatchTo>(err)),
             }
         }) {
             result.push(element)
@@ -171,11 +173,12 @@ where
     fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<T>,
         matches: F,
+    pattern: Option<&'static str>
     ) -> Result<Self, ParseError<T>>
     where
         Self: Sized,
     {
-        let r: Result<Self::ApplyMatchTo, _> = iter.parse_if_match(matches);
+        let r: Result<Self::ApplyMatchTo, _> = iter.parse_if_match(matches, None);
         match r {
             Ok(r) => Ok(Some(r)),
             Err(_) => Ok(None),
@@ -213,13 +216,13 @@ mod tests {
         where
             Self: Sized,
         {
-            let ident= match iter.parse_if_match(|tok|matches!(tok, Token::Identifier(_)))?{
+            let ident= match iter.parse_if_match(|tok|matches!(tok, Token::Identifier(_)), None)?{
                 Token::Identifier(string) => string,
                 _ => unreachable!("Domain error: token returned by parse_if_match should be of the same variant as the token passed as argument"),
             };
             let semi = <Option<Token> as Parsable<Token>>::parse_if_match(iter, |tok| {
                 matches!(tok, Token::SemiColon)
-            })?;
+            }, None)?;
             Ok(TestStruct { ident, semi })
         }
     }
@@ -235,17 +238,18 @@ mod tests {
         where
             Self: Sized,
         {
-            let idents = iter.parse_if_match(|tok| matches!(tok, Token::Identifier(_)))?;
+            let idents = iter.parse_if_match(|tok| matches!(tok, Token::Identifier(_)), None)?;
             Ok(VecStruct { idents })
         }
         fn parse_if_match<F: Fn(&Token) -> bool>(
             iter: &mut TokenIter<Token>,
             f: F,
+            pattern: Option<&'static str>
         ) -> Result<Self, ParseError<Token>>
         where
             Self: Sized,
         {
-            let idents = iter.parse_if_match(f)?;
+            let idents = iter.parse_if_match(f, None)?;
             Ok(VecStruct { idents })
         }
     }
@@ -268,11 +272,12 @@ mod tests {
         fn parse_if_match<F: Fn(&Token) -> bool>(
             iter: &mut TokenIter<Token>,
             f: F,
+            pattern: Option<&'static str>
         ) -> Result<Self, ParseError<Token>>
         where
             Self: Sized,
         {
-            let ident = Box::parse_if_match(iter, f)?;
+            let ident = Box::parse_if_match(iter, f, None)?;
             Ok(BoxStruct { ident })
         }
     }
@@ -378,7 +383,7 @@ mod tests {
         let tokens = vec![t!(ident "hello")];
         let result = BoxStruct::parse_if_match(&mut TokenIter::new(tokens), |t| {
             matches!(t, Token::Identifier(_))
-        });
+        }, None);
         assert!(result.is_ok());
     }
 
@@ -388,7 +393,7 @@ mod tests {
 
         let result = VecStruct::parse_if_match(&mut TokenIter::new(tokens), |tok| {
             matches!(tok, Token::Identifier(_))
-        })
+        }, None)
         .expect("Should be ok");
         assert_eq!(
             result.idents,
@@ -438,9 +443,9 @@ mod tests {
 
     impl Parsable<Token> for ReturnStatement {
         fn parse(iter: &mut TokenIter<Token>) -> Result<ReturnStatement, ParseError<Token>> {
-            let k_return = iter.parse_if_match(|input| matches!(input, Token::KReturn))?;
-            let ident = iter.parse_if_match(|input| matches!(input, Token::Identifier(_)))?;
-            let semi = iter.parse_if_match(|input| matches!(input, Token::SemiColon))?;
+            let k_return = iter.parse_if_match(|input| matches!(input, Token::KReturn), None)?;
+            let ident = iter.parse_if_match(|input| matches!(input, Token::Identifier(_)), None)?;
+            let semi = iter.parse_if_match(|input| matches!(input, Token::SemiColon), None)?;
             Ok(ReturnStatement {
                 k_return,
                 ident,

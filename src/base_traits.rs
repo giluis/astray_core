@@ -55,6 +55,7 @@ where
     fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<TToken>,
         matches: F,
+        pattern: Option<&'static str>
     ) -> Result<Self, ParseError<TToken>>
     where
         Self: Sized {

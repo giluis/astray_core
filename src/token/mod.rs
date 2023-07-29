@@ -215,13 +215,14 @@ impl Parsable<Token> for Token {
     {
         match iter.consume() {
             Some(token) => Ok(token),
-            None => Err(ParseError::no_more_tokens(iter.current)),
+            None => Err(ParseError::no_more_tokens::<Token>(iter.current)),
         }
     }
 
     fn parse_if_match<F: Fn(&Token) -> bool>(
         iter: &mut TokenIter<Token>,
         matches: F,
+        pattern: Option<&'static str>
     ) -> Result<Self, ParseError<Token>>
     where
         Self: Sized,
@@ -237,8 +238,9 @@ impl Parsable<Token> for Token {
                     token_iter.current - 1
                 },
                 found,
+                pattern
             )),
-            _ => Err(ParseError::no_more_tokens(if token_iter.current == 0 {
+            _ => Err(ParseError::no_more_tokens::<Token>(if token_iter.current == 0 {
                 token_iter.current
             } else {
                 token_iter.current - 1
