@@ -13,7 +13,7 @@ categories = ["compilers", "parsing", "text-processing", "algorithms"]
 [dependencies]
 hatch_result = "0.1.7"
 syn = "2.0.15"
-quote = "1.0.23"
-proc-macro2 = "1.0.51"
-either = "1.8.1"
-arr_macro = "0.2.1"
+quote = "1.0.33"
+proc-macro2 = "1.0.69"
+ratatui = "0.23.0"
+crossterm = "0.27.0"

@@ -1,7 +1,7 @@
 use crate::{ParseError, TokenIter};
 
 
-pub trait ConsumableToken: Clone+ std::fmt::Debug + Parsable<Self>{
+pub trait ConsumableToken: Clone + std::fmt::Debug + Parsable<Self>{
 
 }
 
@@ -40,10 +40,10 @@ pub trait ConsumableToken: Clone+ std::fmt::Debug + Parsable<Self>{
 //     }
 // }
 
-pub trait Parsable<TToken>: std::fmt::Debug
+pub trait Parsable<TToken>
 where
     TToken: Parsable<TToken>,
-    Self: Sized,
+    Self: Sized + std::fmt::Debug,
     TToken: ConsumableToken
 
 {

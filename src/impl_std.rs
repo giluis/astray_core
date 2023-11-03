@@ -1,4 +1,3 @@
-
 use crate::{base_traits::Parsable, error::parse_error::ParseError, iter::TokenIter, ConsumableToken};
 
 impl<P1, P2, T> Parsable<T> for (P1, P2)
@@ -27,7 +26,6 @@ where
             if matches(&result) {
                 Ok(result)
             } else {
-                // TODO: Error messages
                 Err(ParseError::parsed_but_unmatching::<Self>(token_iter.current, &result,pattern))
             }
         })
@@ -65,7 +63,6 @@ where
             if matches(&result) {
                 Ok(result)
             } else {
-                // TODO: Error messages
                 Err(ParseError::parsed_but_unmatching::<Self>(token_iter.current, &result,pattern))
             }
         })
@@ -117,7 +114,7 @@ where
     where
         Self: Sized,
     {
-        Ok(Box::new(iter.parse_if_match(matches, None)?))
+        Ok(Box::new(iter.parse_if_match(matches, pattern)?))
     }
 }
 
@@ -140,18 +137,22 @@ where
         F: Fn(&Self::ApplyMatchTo) -> bool,
     {
         let mut result = vec![];
-        while let Ok(element) = iter.try_do(|token_iter| {
-            let result = Self::ApplyMatchTo::parse(token_iter);
-            match result {
-                Ok(aa) if matches(&aa) => Ok(aa),
-                Ok(found_but_unmatching) => {
-                    Err(ParseError::parsed_but_unmatching::<Self::ApplyMatchTo>(token_iter.current, &found_but_unmatching,pattern))
-                }
-                Err(err) => Err(ParseError::from_conjunct_error::<Self::ApplyMatchTo>(err)),
-            }
-        }) {
+        while let Ok(element) = Self::ApplyMatchTo::parse_if_match(iter, &matches, pattern) {
             result.push(element)
         }
+
+        // while let Ok(element) = iter.try_do(|token_iter| {
+        //     let result = Self::ApplyMatchTo::parse(token_iter);
+        //     match result {
+        //         Ok(aa) if matches(&aa) => Ok(aa),
+        //         Ok(found_but_unmatching) => {
+        //             Err(ParseError::parsed_but_unmatching::<Self::ApplyMatchTo>(token_iter.current, &found_but_unmatching,pattern))
+        //         }
+        //         Err(err) => Err(ParseError::from_conjunct_error::<Self::ApplyMatchTo>(err, vec![].as_slice())),
+        //     }
+        // }) {
+        //     result.push(element)
+        // }
         Ok(result)
     }
 }
@@ -173,12 +174,12 @@ where
     fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
         iter: &mut TokenIter<T>,
         matches: F,
-    pattern: Option<&'static str>
+        pattern: Option<&'static str>
     ) -> Result<Self, ParseError<T>>
     where
         Self: Sized,
     {
-        let r: Result<Self::ApplyMatchTo, _> = iter.parse_if_match(matches, None);
+        let r: Result<Self::ApplyMatchTo, _> = iter.parse_if_match(matches, pattern);
         match r {
             Ok(r) => Ok(Some(r)),
             Err(_) => Ok(None),
@@ -249,7 +250,7 @@ mod tests {
         where
             Self: Sized,
         {
-            let idents = iter.parse_if_match(f, None)?;
+            let idents = iter.parse_if_match(f, pattern)?;
             Ok(VecStruct { idents })
         }
     }
@@ -277,7 +278,7 @@ mod tests {
         where
             Self: Sized,
         {
-            let ident = Box::parse_if_match(iter, f, None)?;
+            let ident = Box::parse_if_match(iter, f, pattern)?;
             Ok(BoxStruct { ident })
         }
     }

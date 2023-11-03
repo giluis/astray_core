@@ -1,3 +1,5 @@
+use crossterm::style::Stylize;
+
 use crate::{ConsumableToken, Parsable};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -5,11 +7,21 @@ pub enum ParseErrorType<T>
 where
     T: ConsumableToken,
 {
-    UnexpectedToken { expected: T, found: T },
+    UnexpectedToken {
+        expected: T,
+        found: T,
+    },
     NoMoreTokens,
-    ParsedButUnmatching { err_msg: String }, // TODO: specify extra fields here which might be useful
-    ConjunctBranchParsingFailure { err_source: Box<ParseError<T>> },
-    DisjunctBranchParsingFailure { err_source: Vec<ParseError<T>> },
+    ParsedButUnmatching {
+        err_msg: String,
+    },
+    ConjunctBranchParsingFailure {
+        successes: Vec<String>,
+        err_source: Box<ParseError<T>>,
+    },
+    DisjunctBranchParsingFailure {
+        err_source: Vec<ParseError<T>>,
+    },
 }
 
 // TODO: Refactor type_name
@@ -62,13 +74,14 @@ where
         ParseError::new::<P>(failed_at, ParseErrorType::NoMoreTokens)
     }
 
-    pub fn from_conjunct_error<P>(other: ParseError<T>) -> Self
+    pub fn from_conjunct_error<P>(other: ParseError<T>, sucessses: &[String]) -> Self
     where
         P: Parsable<T>,
     {
         ParseError::new::<P>(
             other.failed_at,
             ParseErrorType::ConjunctBranchParsingFailure {
+                successes: vec![],
                 err_source: Box::new(other),
             },
         )
@@ -84,7 +97,7 @@ where
         )
     }
 
-    pub fn to_string(&self, indentation_level: usize) -> String {
+    pub fn stringify(&self, indentation_level: usize) -> String {
         let tabs = "\t".repeat(indentation_level);
         match &self.failure_type {
             ParseErrorType::UnexpectedToken { expected, found } => {
@@ -97,8 +110,8 @@ where
             ParseErrorType::ParsedButUnmatching { err_msg } => {
                 format!("{tabs}{err_msg}")
             }
-            ParseErrorType::ConjunctBranchParsingFailure { err_source } => {
-                let err_source_str = err_source.to_string(indentation_level + 1);
+            ParseErrorType::ConjunctBranchParsingFailure { err_source, .. } => {
+                let err_source_str = err_source.stringify(indentation_level + 1);
                 format!(
                     "{tabs}Failed to parse {}:\n{err_source_str}",
                     self.type_name
@@ -107,12 +120,19 @@ where
             ParseErrorType::DisjunctBranchParsingFailure { err_source } => {
                 let errors = err_source
                     .iter()
-                    .map(|e| e.to_string(indentation_level + 1))
+                    .map(|e| e.stringify(indentation_level + 1))
                     .reduce(|accum, curr| accum + "\n" + &curr)
                     .expect("Enums without variants cannot implement Parsable");
                 format!("{tabs}Failed to parse {}:\n{errors}", self.type_name)
             }
         }
+    }
+}
+
+impl<T: ConsumableToken> std::fmt::Display for ParseError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", "red".red())
+        // write!(f,"{}",self.stringify(0))
     }
 }
 
@@ -122,27 +142,35 @@ mod tests {
     use crate::{t, Parsable, ParseError};
 
     #[test]
+    fn a() {
+        let error = ParseError::from_conjunct_error::<Token>(
+            ParseError::from_disjunct_errors::<Token>(
+                1,
+                vec![
+                    ParseError::parsed_but_unmatching::<Token>(1, &t!(return), Some("hahah ")),
+                    ParseError::parsed_but_unmatching::<Token>(1, &t!(litint 3), Some("heeh")),
+                ],
+            ),
+            vec![].as_slice(),
+        );
+        println!("{error}")
+    }
+
+    #[test]
     fn to_string() {
         let pattern1 = "Token::KwReturn";
         let pattern2 = "Token::LiteralInt(_)";
-        let result =
-            ParseError::from_conjunct_error::<Token>(
-                ParseError::from_disjunct_errors::<Token>(
+        let result = ParseError::from_conjunct_error::<Token>(
+            ParseError::from_disjunct_errors::<Token>(
                 1,
                 vec![
-                    ParseError::parsed_but_unmatching::<Token>(
-                        1,
-                        &t!(return),
-                        Some(pattern1),
-                    ),
-                    ParseError::parsed_but_unmatching::<Token>(
-                        1,
-                        &t!(litint 3),
-                        Some(pattern2),
-                    ),
+                    ParseError::parsed_but_unmatching::<Token>(1, &t!(return), Some(pattern1)),
+                    ParseError::parsed_but_unmatching::<Token>(1, &t!(litint 3), Some(pattern2)),
                 ],
-            ))
-            .to_string(0);
+            ),
+            vec![].as_slice(),
+        )
+        .stringify(0);
         let expected_identifier = <Token as Parsable<Token>>::identifier();
         let expected = format!(
             "Failed to parse {expected_identifier}:
