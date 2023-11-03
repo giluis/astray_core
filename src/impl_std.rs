@@ -141,18 +141,6 @@ where
             result.push(element)
         }
 
-        // while let Ok(element) = iter.try_do(|token_iter| {
-        //     let result = Self::ApplyMatchTo::parse(token_iter);
-        //     match result {
-        //         Ok(aa) if matches(&aa) => Ok(aa),
-        //         Ok(found_but_unmatching) => {
-        //             Err(ParseError::parsed_but_unmatching::<Self::ApplyMatchTo>(token_iter.current, &found_but_unmatching,pattern))
-        //         }
-        //         Err(err) => Err(ParseError::from_conjunct_error::<Self::ApplyMatchTo>(err, vec![].as_slice())),
-        //     }
-        // }) {
-        //     result.push(element)
-        // }
         Ok(result)
     }
 }
