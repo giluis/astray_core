@@ -1,4 +1,10 @@
-use crate::{Token, Parsable, TokenIter, ParseError, t};
+use crate::base_traits::{Matcher, Parsable, Parser};
+use crate::error::ParseError;
+use crate::iter::TokenIter;
+use crate::matcher;
+use crate::t;
+use crate::token::Token;
+use derive_builder::Builder;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct TestStruct {
@@ -8,27 +14,48 @@ pub struct TestStruct {
     pub value: u32,
 }
 
-// impl Parsable<Token> for TestStruct {
-//     fn parse<'a>(iter: &mut TokenIter<Token>) -> Result<TestStruct, ParseError<Token>> {
-//         iter.try_do(|token_iter| {
-//             let var_type = token_iter.parse_if_match(|token|matches!(token,t!(int)), None)?;
+impl Parsable<Token> for TestStruct {
+    fn parser() -> impl Parser<Token, Self> {
+        TestStructParser::default()
+    }
+}
 
-//             let var_name = match token_iter.parse_if_match(|token|matches!(token, Token::Identifier(_)), None)? {
-//                 Token::Identifier(ident_str) => ident_str,
-//                 _ => unreachable!("Internal error, should be ident_str"),
-//             };
+#[derive(Default, Builder)]
+pub struct TestStructParser {}
 
-//             let equals_sign = token_iter.parse_if_match(|token|matches!(token,t!( = )), None)?;
-//             let value = match token_iter.parse_if_match(|token|matches!(token,Token::LiteralInt(_)), None)? {
-//                 Token::LiteralInt(value) => value,
-//                 _ => unreachable!("Internal error: should be lit int"),
-//             };
-//             Ok(TestStruct {
-//                 var_type,
-//                 var_name,
-//                 equals_sign,
-//                 value,
-//             })
-//         })
-//     }
-// }
+impl Parser<Token, TestStruct> for TestStructParser {
+    fn parse<'a>(&self, iter: &mut TokenIter<Token>) -> Result<TestStruct, ParseError> {
+        iter.try_do(|token_iter| {
+            let var_type = Token::parser()
+                .with_matcher(matcher!(t!(int)))
+                .parse(token_iter)?;
+
+            let var_name = match Token::parser()
+                .with_matcher(matcher!(Token::Identifier(_)))
+                .parse(token_iter)?
+            {
+                Token::Identifier(ident_str) => ident_str,
+                _ => unreachable!("Internal error, should be ident_str"),
+            };
+
+            let equals_sign = Token::parser()
+                .with_matcher(matcher!(t!(=)))
+                .parse(token_iter)?;
+
+            let value = match Token::parser()
+                .with_matcher(matcher!(Token::LiteralInt(_)))
+                .parse(token_iter)?
+            {
+                Token::LiteralInt(ident_str) => ident_str,
+                _ => unreachable!("Internal error, should be ltoken_iteral int"),
+            };
+
+            Ok(TestStruct {
+                var_type,
+                var_name,
+                equals_sign,
+                value,
+            })
+        })
+    }
+}

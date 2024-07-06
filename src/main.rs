@@ -1,5 +1,5 @@
-use astray_core::print_error;
+use astray_core::{print_error, FunctionValidator, Matcher,validator, Token};
 
 fn main() {
-    let _ = print_error::read_line();
+    validator!(Token::Comma);
 }

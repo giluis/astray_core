@@ -1,6 +1,6 @@
-use std::cmp::max;
+use std::{cmp::max, default};
 
-use crate::{ConsumableToken, Parsable, ParseError, TokenIter};
+use crate::{ConsumableToken, Matcher, Parsable, ParseError, Parser, TokenIter};
 
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct LiteralStringValue {
@@ -209,14 +209,47 @@ macro_rules! t {
 impl ConsumableToken for Token {}
 
 impl Parsable<Token> for Token {
-    fn parse(iter: &mut TokenIter<Token>) -> Result<Self, ParseError<Token>>
+    fn parser() -> TokenParser
     where
         Self: Sized,
     {
-        match iter.consume() {
-            Some(token) => Ok(token),
-            None => Err(ParseError::no_more_tokens::<Token>(iter.current)),
-        }
+        TokenParser::default()
     }
+}
 
+pub struct TokenParser(Matcher<Token>);
+impl Default for TokenParser {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+
+impl TokenParser {
+    pub fn with_matcher(&mut self, matcher: Matcher<Token>) -> &mut Self {
+        self.0 = matcher; 
+        self
+    }
+}
+
+
+impl Parser<Token, Token> for TokenParser {
+    fn parse(&self, iter: &mut TokenIter<Token>) -> Result<Token, ParseError> {
+        iter.consume()
+            .ok_or(ParseError::no_more_tokens::<Token>(iter.current))
+            .and_then(|t| {
+                if (self.0)(&t) {
+                    Ok(t)
+                } else {
+                    // TODO: improve this later
+                    iter.current -= 1;
+                    Err(ParseError::parsed_but_unmatching(
+                        iter.current,
+                        &t,
+                        // TODO: update error message
+                        &format!("Parsed Token , but it did not match"),
+                    ))
+                }
+            })
+    }
 }

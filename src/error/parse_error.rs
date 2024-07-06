@@ -2,90 +2,86 @@
 use crate::base_traits::{Parsable, ConsumableToken};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseErrorType<T>
+pub enum ParseErrorType
 {
-    UnexpectedToken {
-        expected: T,
-        found: T,
-    },
     NoMoreTokens,
     ParsedButUnmatching {
         err_msg: String,
     },
     ConjunctBranchParsingFailure {
         successes: Vec<String>,
-        err_source: Box<ParseError<T>>,
+        err_source: Box<ParseError>,
     },
     DisjunctBranchParsingFailure {
-        err_source: Vec<ParseError<T>>,
+        err_source: Vec<ParseError>,
     },
 }
 
 // TODO: Refactor type_name
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseError<T>
+pub struct ParseError
 {
     type_name: &'static str,
     failed_at: usize,
-    pub failure_type: ParseErrorType<T>,
+    pub failure_type: ParseErrorType,
 }
 
-impl<T> ParseError<T>
-where T: ConsumableToken
+
+pub fn identifier<P>() -> &'static str {
+    std::any::type_name::<P>()
+}
+
+impl ParseError
+
 {
-    pub fn new<P>(failed_at: usize, failure_type: ParseErrorType<T>) -> Self
-    where
-        P: Parsable<T>,
+    pub fn new(type_name: &'static str , failed_at: usize, failure_type: ParseErrorType) -> Self
     {
         Self {
-            type_name: P::identifier(),
+            type_name,
             failed_at,
             failure_type,
         }
     }
 
-    pub fn parsed_but_unmatching<P>(
+    pub fn parsed_but_unmatching< T, P>(
         failed_at: usize,
         result: &P,
-        pattern: Option<&'static str>,
+        pattern: & str,
     ) -> Self
     where
+        T: ConsumableToken,
         P: Parsable<T>,
+
     {
-        let pattern = pattern.unwrap_or("(pattern not provided by user)");
-        let type_name = <P as Parsable<T>>::identifier();
+        let type_name = identifier::<P>();
         let err_msg = format!(
             "Parsed {:?}: {type_name}, but it did not match pattern '{pattern}'",
             result
         );
-        ParseError::new::<P>(failed_at, ParseErrorType::ParsedButUnmatching { err_msg })
+        ParseError::new(type_name, failed_at, ParseErrorType::ParsedButUnmatching { err_msg })
     }
 
-    pub fn no_more_tokens<P>(failed_at: usize) -> Self
-    where
-        P: Parsable<T>,
+    pub fn no_more_tokens<T:ConsumableToken>(failed_at: usize) -> Self
     {
-        ParseError::new::<P>(failed_at, ParseErrorType::NoMoreTokens)
+        ParseError::new(identifier::<T>(), failed_at, ParseErrorType::NoMoreTokens)
     }
 
-    pub fn from_conjunct_error<P>(other: ParseError<T>, sucessses: &[String]) -> Self
-    where
-        P: Parsable<T>,
+    pub fn from_conjunct_error<P>(other: ParseError, successes: Vec<String>) -> Self
     {
-        ParseError::new::<P>(
+        ParseError::new(
+            identifier::<P>(),
             other.failed_at,
             ParseErrorType::ConjunctBranchParsingFailure {
-                successes: vec![],
+                successes,
                 err_source: Box::new(other),
             },
         )
     }
 
-    pub fn from_disjunct_errors<P>(failed_at: usize, err_source: Vec<ParseError<T>>) -> Self
-    where
-        P: Parsable<T>,
+    pub fn from_disjunct_errors<P>(failed_at: usize, err_source: Vec<ParseError>) -> Self
     {
-        ParseError::new::<P>(
+        ParseError::new(
+            identifier::<P>(),
             failed_at,
             ParseErrorType::DisjunctBranchParsingFailure { err_source },
         )
@@ -94,10 +90,6 @@ where T: ConsumableToken
     pub fn stringify(&self, indentation_level: usize) -> String {
         let tabs = "\t".repeat(indentation_level);
         match &self.failure_type {
-            ParseErrorType::UnexpectedToken { expected, found } => {
-                let more_tabs = "\t".repeat(indentation_level + 1);
-                format!("{tabs}Unexpected Token Error\n{more_tabs}Expected {:?}\n{more_tabs}Found {:?}\n", expected, found)
-            }
             ParseErrorType::NoMoreTokens => {
                 format!("{tabs}Ran out of tokens\n")
             }
@@ -133,7 +125,8 @@ where T: ConsumableToken
     }
 }
 
-impl <T> std::fmt::Display for ParseError<T> {
+impl  std::fmt::Display for ParseError 
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.stringify(0))
         // write!(f,"{}",self.stringify(0))

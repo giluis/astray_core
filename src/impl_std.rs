@@ -1,5 +1,9 @@
 use crate::{
-    base_traits::{Matcher, Parsable, Validator}, error::parse_error::{ParseError, ParseErrorType}, iter::TokenIter, ConsumableToken,
+    base_traits::{Matcher, Parsable, Parser},
+    error::parse_error::{ParseError, ParseErrorType},
+    identifier,
+    iter::TokenIter,
+    ConsumableToken,
 };
 
 impl<P1, P2, T> Parsable<T> for (P1, P2)
@@ -8,36 +12,36 @@ where
     P2: Parsable<T>,
     T: ConsumableToken,
 {
-    type V = Tuple2Validator<P1, P2>;
-    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
-    where
-        Self: Sized,
-    {
-        Ok((iter.parse()?, iter.parse()?))
+    fn parser() -> impl Parser<T, Self> {
+        Tuple2Validator::default()
     }
 }
 
-#[derive(Default)]
 struct Tuple2Validator<P1, P2>(Matcher<P1>, Matcher<P2>);
 
-impl<T, P1, P2> Validator<T, (P1, P2)> for Tuple2Validator<P1, P2>
+impl<P1, P2> Default for Tuple2Validator<P1, P2> {
+    fn default() -> Self {
+        Self(Default::default(), Default::default())
+    }
+}
+
+impl<T, P1, P2> Parser<T, (P1, P2)> for Tuple2Validator<P1, P2>
 where
     P1: Parsable<T>,
     P2: Parsable<T>,
     T: ConsumableToken,
 {
-    fn validate(&self, iter: &mut TokenIter<T>) -> Result<(P1, P2), ParseError<T>> {
+    fn parse(&self, iter: &mut TokenIter<T>) -> Result<(P1, P2), ParseError> {
         let p1: P1 = iter.parse::<P1>()?;
         let p2: P2 = iter.parse::<P2>()?;
         if (self.0)(&p1) && (self.1)(&p2) {
             Ok((p1, p2))
         } else {
-            Err(ParseError::new::<(P1, P2)>(
+            Err(ParseError::parsed_but_unmatching(
                 iter.current,
-                ParseErrorType::ParsedButUnmatching {
-                    // TODO: add nice error message
-                    err_msg: "Could not parse (P1, P2)".to_owned(),
-                },
+                &(p1, p2),
+                //TODO: add nicer error messages
+                "Could not parse (P1, P2)",
             ))
         }
     }
@@ -50,42 +54,37 @@ where
     P3: Parsable<T>,
     T: ConsumableToken,
 {
-    type V = Tuple3Validator<P1, P2, P3>;
-    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
-    where
-        Self: Sized,
-    {
-        Ok((
-            iter.parse::<P1>()?,
-            iter.parse::<P2>()?,
-            iter.parse::<P3>()?,
-        ))
+    fn parser() -> impl Parser<T, Self> {
+        Tuple3Validator::default()
     }
 }
 
-#[derive(Default)]
 struct Tuple3Validator<P1, P2, P3>(Matcher<P1>, Matcher<P2>, Matcher<P3>);
 
-impl<T, P1, P2, P3> Validator<T, (P1, P2, P3)> for Tuple3Validator<P1, P2, P3>
+impl<P1, P2, P3> Default for Tuple3Validator<P1, P2, P3> {
+    fn default() -> Self {
+        Self(Default::default(), Default::default(), Default::default())
+    }
+}
+
+impl<T, P1, P2, P3> Parser<T, (P1, P2, P3)> for Tuple3Validator<P1, P2, P3>
 where
     P1: Parsable<T>,
     P2: Parsable<T>,
     P3: Parsable<T>,
-    T: ConsumableToken
+    T: ConsumableToken,
 {
-    fn validate(&self, iter: &mut TokenIter<T>) -> Result<(P1, P2, P3), ParseError<T>> {
+    fn parse(&self, iter: &mut TokenIter<T>) -> Result<(P1, P2, P3), ParseError> {
         let p1: P1 = iter.parse::<P1>()?;
         let p2: P2 = iter.parse::<P2>()?;
         let p3: P3 = iter.parse::<P3>()?;
         if (self.0)(&p1) && (self.1)(&p2) && (self.2)(&p3) {
             Ok((p1, p2, p3))
         } else {
-            Err(ParseError::new::<(P1, P2, P3)>(
+            Err(ParseError::parsed_but_unmatching(
                 iter.current,
-                ParseErrorType::ParsedButUnmatching {
-                    // TODO: add nice error message
-                    err_msg: "Could not parse (P1, P2, P3)".to_owned(),
-                },
+                &(p1, p2, p3),
+                "Could not parse (P1, P2, P3)",
             ))
         }
     }
@@ -99,46 +98,49 @@ where
     P4: Parsable<T>,
     T: ConsumableToken,
 {
-    type V = Tuple4Validator<P1, P2, P3, P4>;
-    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+    fn parser() -> impl Parser<T, Self>
     where
         Self: Sized,
     {
-        Ok((
-            iter.parse::<P1>()?,
-            iter.parse::<P2>()?,
-            iter.parse::<P3>()?,
-            iter.parse::<P4>()?,
-        ))
+        Tuple4Validator::default()
     }
 }
 
-#[derive(Default)]
-struct Tuple4Validator<P1, P2, P3, P4>(Matcher<P1>, Matcher<P2>, Matcher<P3>,Matcher<P4>);
+struct Tuple4Validator<P1, P2, P3, P4>(Matcher<P1>, Matcher<P2>, Matcher<P3>, Matcher<P4>);
 
-impl<T, P1, P2, P3, P4> Validator<T, (P1, P2, P3, P4)> for Tuple4Validator<P1, P2, P3, P4>
+impl<P1, P2, P3, P4> Default for Tuple4Validator<P1, P2, P3, P4> {
+    fn default() -> Self {
+        Self(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
+    }
+}
+
+impl<T, P1, P2, P3, P4> Parser<T, (P1, P2, P3, P4)> for Tuple4Validator<P1, P2, P3, P4>
 where
     P1: Parsable<T>,
     P2: Parsable<T>,
     P3: Parsable<T>,
     P4: Parsable<T>,
-    T: ConsumableToken
+    T: ConsumableToken,
 {
-    fn validate(&self, iter: &mut TokenIter<T>) -> Result<(P1, P2, P3, P4), ParseError<T>> {
+    fn parse(&self, iter: &mut TokenIter<T>) -> Result<(P1, P2, P3, P4), ParseError> {
         let p1: P1 = iter.parse::<P1>()?;
         let p2: P2 = iter.parse::<P2>()?;
         let p3: P3 = iter.parse::<P3>()?;
         let p4: P4 = iter.parse::<P4>()?;
-        if (self.0)(&p1) && (self.1)(&p2) && (self.2)(&p3) && (self.2)(&p4) {
+        if (self.0)(&p1) && (self.1)(&p2) && (self.2)(&p3) && (self.3)(&p4) {
             Ok((p1, p2, p3, p4))
         } else {
-            Err(Err(ParseError::new::<(P1, P2, P3, P4)>(
-                    iter.current,
-                    ParseErrorType::ParsedButUnmatching {
-                        // TODO: add nice error message
-                        err_msg: "Could not parse (P1, P2, P3, P4)".to_owned(),
-                    },
-                    )))
+            Err(ParseError::parsed_but_unmatching(
+                iter.current,
+                &(p1, p2, p3, p4),
+                // TODO: add nice error message
+                "Could not parse (P1, P2, P3, P4)",
+            ))
         }
     }
 }
@@ -149,68 +151,70 @@ where
     P: Parsable<T>,
     T: ConsumableToken,
 {
-    type V = BoxValidator<P>;
-    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
+    fn parser() -> impl Parser<T, Self>
     where
         Self: Sized,
     {
-        Ok(Box::new(P::parse(iter)?))
+        BoxValidator::default()
     }
 }
 
-#[derive(Default)]
-struct BoxValidator<P> 
-where {
+struct BoxValidator<P> {
     t: Matcher<P>,
 }
 
-impl <T: ConsumableToken, P: Parsable<T>> Validator<T, Box<P>> for BoxValidator<P> {
-    fn validate(&self, iter: &mut TokenIter<T>) -> Result<Box<P>, ParseError<T>> {
-        let p = iter.parse::<P>()?;
-        if (self.t)(&p) {
-            Ok(Box::new(p))
-        } else {
-            Err(Err(ParseError::new<Box<P>>(
-                    iter.current,
-                    ParseErrorType::ParsedButUnmatching {
-                        // TODO: add nice error message
-                        err_msg: "Could not parse Option<P>".to_owned(),
-                    },
-                    )))
-
+impl<P> Default for BoxValidator<P> {
+    fn default() -> Self {
+        Self {
+            t: Default::default(),
         }
     }
 }
 
-
+impl<T: ConsumableToken, P: Parsable<T>> Parser<T, Box<P>> for BoxValidator<P> {
+    fn parse(&self, iter: &mut TokenIter<T>) -> Result<Box<P>, ParseError> {
+        let p = iter.parse::<P>()?;
+        if (self.t)(&p) {
+            Ok(Box::new(p))
+        } else {
+            Err(ParseError::parsed_but_unmatching(
+                iter.current,
+                &p,
+                // TODO: add nice error message
+                "Could not parse Option<P>",
+            ))
+        }
+    }
+}
 
 impl<T, P> Parsable<T> for Vec<P>
 where
     P: Parsable<T>,
     T: ConsumableToken,
 {
-    type V = VecValidator<P>;
-    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
-        let mut results = vec![];
-        while let Ok(r) = P::parse(iter) {
-            results.push(r);
-        }
-        Ok(results)
+    fn parser() -> impl Parser<T, Self> {
+        VecValidator::default()
     }
 }
 
-#[derive(Default)]
 struct VecValidator<P> {
-    matcher: Matcher<P>
+    matcher: Matcher<P>,
 }
 
+impl<P> Default for VecValidator<P> {
+    fn default() -> Self {
+        Self {
+            matcher: Default::default(),
+        }
+    }
+}
 
-impl <T: ConsumableToken, P: Parsable<T>> Validator<T,Vec<P>> for VecValidator<P>{
-    fn validate(&self, iter: &mut TokenIter<T>) -> Result<Vec<P>, ParseError<T>> {
+impl<T: ConsumableToken, P: Parsable<T>> Parser<T, Vec<P>> for VecValidator<P> {
+    fn parse(&self, iter: &mut TokenIter<T>) -> Result<Vec<P>, ParseError> {
         let mut result = vec![];
 
         while let Ok(element) = iter.parse() {
-            if !(self.matcher) (&element) {
+            if !(self.matcher)(&element) {
                 break;
             }
             result.push(element);
@@ -225,33 +229,29 @@ where
     P: Parsable<T>,
     T: ConsumableToken,
 {
-    type V = OptionValidator<P>;
-    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>> {
-        let r = iter.parse();
-        match r {
-            Ok(r) => Ok(Some(r)),
-            Err(_) => Ok(None),
-        }
+    fn parser() -> impl Parser<T, Self> {
+        OptionValidator::default()
     }
-
 }
 
 struct OptionValidator<P> {
     t: Matcher<P>,
 }
 
-impl <P> Default for OptionValidator<P>{
+impl<P> Default for OptionValidator<P> {
     fn default() -> Self {
-        Self { t: Default::default() }
+        Self {
+            t: Default::default(),
+        }
     }
 }
 
-impl <T: ConsumableToken, P: Parsable<T>> Validator<T,Option<P>> for OptionValidator<P> {
-    fn validate(&self, iter: &mut TokenIter<T>) -> Result<Option<P>,ParseError<T>> {
+impl<T: ConsumableToken, P: Parsable<T>> Parser<T, Option<P>> for OptionValidator<P> {
+    fn parse(&self, iter: &mut TokenIter<T>) -> Result<Option<P>, ParseError> {
         let p = iter.parse()?;
         if (self.t)(&p) {
             Ok(Some(p))
-        } else  {
+        } else {
             Ok(None)
         }
     }
