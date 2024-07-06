@@ -41,12 +41,11 @@ where
         self.try_do(|token_iter| P::parse(token_iter))
     }
 
-    pub fn parse_if_match<F, P>(&mut self, matcher: F, pattern: Option<&'static str>) -> Result<P, ParseError<Token>>
+    pub fn parse_if_match<P, I>(&mut self, validator: P::V) -> Result<P, ParseError<Token>>
     where
         P: Parsable<Token>,
-        F: Fn(&P::ApplyMatchTo) -> bool,
     {
-        self.try_do(|token_iter| P::parse_if_match(token_iter, matcher, pattern))
+        self.try_do(|token_iter| validator.validate(token_iter))
     }
 
     pub fn parse_while<I, F, Q>(&mut self, _keep_going: F) -> I
@@ -90,19 +89,19 @@ mod tests {
             Token::Identifier("Some identifier".to_string()),
         ]);
 
-        let result = iter.parse_if_match(|t| matches!(t, Token::Comma), None);
+        let result = iter.parse_if_match(|t| matches!(t, Token::Comma));
         assert_eq!(result, Ok(Token::Comma));
 
-        let result = iter.parse_if_match(|t| matches!(t, Token::Identifier(_)), None);
+        let result = iter.parse_if_match(|t| matches!(t, Token::Identifier(_)));
         assert_eq!(result, Ok(Token::Identifier("Some identifier".to_string())));
 
-        let result: Result<Token, _> = iter.parse_if_match(|t| matches!(t, Token::Identifier(_)), None);
+        let result: Result<Token, _> = iter.parse_if_match(|t| matches!(t, Token::Identifier(_)));
         assert_eq!(result, Err(ParseError::no_more_tokens::<Token>(1)));
 
         let mut iter: TokenIter<Token> =
             TokenIter::new(vec![Token::Identifier("Some identifier".to_string())]);
 
-        let result: Result<Token, _> = iter.parse_if_match(|t| matches!(t, Token::Comma), None);
+        let result: Result<Token, _> = iter.parse_if_match(|t| matches!(t, Token::Comma));
         assert!(result.is_err());
     }
 
@@ -111,8 +110,8 @@ mod tests {
     fn failed_parse_if_match() {
         let tokens = vec![t!(litint 32)];
         let mut iter = TokenIter::new(tokens);
-        let result: Result<Token, _> = iter.parse_if_match(|tok| matches!(tok, t!(return)), None);
-        let expected = Err(ParseError::parsed_but_unmatching(iter.current, &t!(litint 32), None));
+        let result: Result<Token, _> = iter.parse_if_match(|tok| matches!(tok, t!(return)));
+        let expected = Err(ParseError::parsed_but_unmatching(iter.current, &t!(litint 32), Some("Could not parse Token::KwReturn")));
         assert_eq!(expected, result);
         assert!(iter.current == 0);
     }
@@ -203,7 +202,7 @@ mod tests {
         let tokens = vec![];
         let mut iter = TokenIter::new(tokens);
 
-        let result: Result<Token, _> = iter.parse_if_match(|tok| matches!(tok, t!(l_paren)), None);
+        let result: Result<Token, _> = iter.parse_if_match(|tok| matches!(tok, t!(l_paren)));
         assert!(result.is_err());
         assert!(iter.current == 0);
     }
@@ -214,20 +213,20 @@ mod tests {
         let mut iter = TokenIter::new(tokens);
 
         let lparen_r: Token = iter
-            .parse_if_match(|tok| matches!(tok, t!(l_paren)), None)
+            .parse_if_match(|tok| matches!(tok, t!(l_paren)))
             .unwrap();
         assert!(lparen_r == t!(l_paren));
 
         let rparen_r: Token = iter
-            .parse_if_match(|tok| matches!(tok, t!(r_paren)), None)
+            .parse_if_match(|tok| matches!(tok, t!(r_paren)))
             .unwrap();
         assert!(rparen_r == t!(r_paren));
 
-        let comma_r: Token = iter.parse_if_match(|tok| matches!(tok, t!( , )), None).unwrap();
+        let comma_r: Token = iter.parse_if_match(|tok| matches!(tok, t!( , ))).unwrap();
         assert_eq!(comma_r, t!( , ));
 
         let litint_r: Token = iter
-            .parse_if_match(|tok| matches!(tok, t!(litint 4)), None)
+            .parse_if_match(|tok| matches!(tok, t!(litint 4)))
             .unwrap();
         assert!(litint_r == t!(litint 4));
 

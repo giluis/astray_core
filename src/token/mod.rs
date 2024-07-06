@@ -219,36 +219,4 @@ impl Parsable<Token> for Token {
         }
     }
 
-    fn parse_if_match<F: Fn(&Token) -> bool>(
-        iter: &mut TokenIter<Token>,
-        matches: F,
-        pattern: Option<&'static str>
-    ) -> Result<Self, ParseError<Token>>
-    where
-        Self: Sized,
-    {
-        // This TODO seems to be outdated and deprecated
-        // Comparison will always be necessary. The question is whether or not 
-        // matches! is the best way to achieve this use case ,which I think it is.
-        // Patterns cannot be passed as values, so a match function is needed
-        // TODO: find a way to express this that doesn't need matching:
-        // this introduces overhead every time a token is parsed
-        iter.try_do(|token_iter| match token_iter.consume() {
-            Some(ref found) if matches(found) => Ok(found.clone()),
-            Some(ref found) => Err(ParseError::parsed_but_unmatching::<Token>(
-                if token_iter.current == 0 {
-                    token_iter.current
-                } else {
-                    token_iter.current - 1
-                },
-                found,
-                pattern
-            )),
-            _ => Err(ParseError::no_more_tokens::<Token>(if token_iter.current == 0 {
-                token_iter.current
-            } else {
-                token_iter.current - 1
-            })),
-        })
-    }
 }

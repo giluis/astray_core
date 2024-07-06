@@ -1,69 +1,42 @@
 use crate::{ParseError, TokenIter};
 
+pub trait ConsumableToken: Clone + std::fmt::Debug + Parsable<Self> {}
 
-pub trait ConsumableToken: Clone + std::fmt::Debug + Parsable<Self>{
-
-}
-
-
-
-// impl<T> Parsable<T> for T
-// where
-//     T: ConsumableToken,
-// {
-//     fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>
-//     where
-//         Self: Sized,
-//     {
-//         match iter.consume() {
-//             Some(token) => Ok(token),
-//             None => Err(ParseError::no_more_tokens(iter.current))
-//         }
-//     }
-
-//     fn parse_if_match<F: Fn(&T) -> bool>(
-//         iter: &mut TokenIter<T>,
-//         matches: F,
-//     ) -> Result<Self, ParseError<T>>
-//     where
-//         Self: Sized,
-//     {
-//         match iter.consume() {
-//             Some(ref found) if matches(found) => Ok(found.clone()),
-//             Some(ref found) => Err(ParseError::unmatching_token(
-//                 iter.current,
-//                 "Failed to expected token not found".to_string(),
-//                 found.clone(),
-//             )),
-//             _ => Err(ParseError::no_more_tokens(iter.current)),
-//         }
-//     }
-// }
-
-pub trait Parsable<TToken>
+pub trait Parsable<T>
 where
-    TToken: Parsable<TToken>,
     Self: Sized + std::fmt::Debug,
-    TToken: ConsumableToken
-
+    T: ConsumableToken,
 {
-    type ApplyMatchTo: Parsable<TToken> = Self;
 
-    fn parse(iter: &mut TokenIter<TToken>) -> Result<Self, ParseError<TToken>>;
+    type V: Validator<T, Self> = NoOpValidator;
+    fn parse(iter: &mut TokenIter<T>) -> Result<Self, ParseError<T>>;
 
-    #[allow(unused_variables)]
-    fn parse_if_match<F: Fn(&Self::ApplyMatchTo) -> bool>(
-        iter: &mut TokenIter<TToken>,
-        matches: F,
-        pattern: Option<&'static str>
-    ) -> Result<Self, ParseError<TToken>>
-    where
-        Self: Sized {
-            todo!("parse_if_match not yet implemented for {:?}", Self::identifier());
-        }
-    
+    fn validator() -> Self::V {
+        Self::V::default()
+    }
 
     fn identifier() -> &'static str {
         std::any::type_name::<Self>()
+    }
+}
+
+pub type Matcher<T> = fn (&T) -> bool;
+
+#[allow(non_snake_case)]
+fn DEFAULT_MATCHER<T>(arg: &T) -> bool {
+    true
+}
+
+pub trait Validator<T, P>: Default
+where T: ConsumableToken, P: Parsable<T>
+{
+    fn validate(&self, iter: &mut TokenIter<T>) -> Result<P, ParseError<T>>;
+}
+
+pub struct NoOpValidator;
+
+impl <T: ConsumableToken, P: Parsable<T>> Validator<T, P> for NoOpValidator {
+    fn validate(&self, iter: &mut TokenIter<T>) -> Result<P, ParseError<T>>{
+        iter.parse()
     }
 }
