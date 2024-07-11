@@ -1,4 +1,4 @@
-use crate::base_traits::{Matcher, Parsable, Parser};
+use crate::base_traits::{Pattern, Parsable, Parser};
 use crate::error::ParseError;
 use crate::iter::TokenIter;
 use crate::matcher;
@@ -15,7 +15,8 @@ pub struct TestStruct {
 }
 
 impl Parsable<Token> for TestStruct {
-    fn parser() -> impl Parser<Token, Self> {
+    type P = TestStructParser;
+    fn parser() -> Self::P{
         TestStructParser::default()
     }
 }

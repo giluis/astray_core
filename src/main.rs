@@ -1,5 +1,9 @@
-use astray_core::{print_error, FunctionValidator, Matcher,validator, Token};
+use astray_core::{matcher, print_error, Pattern, Token};
 
 fn main() {
-    validator!(Token::Comma);
+    Pattern {
+    fun:|t|{
+        matches!(t,Token::INVALID)
+    },pat:"Token :: INVALID"
+};
 }

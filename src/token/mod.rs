@@ -1,6 +1,6 @@
 use std::{cmp::max, default};
 
-use crate::{ConsumableToken, Matcher, Parsable, ParseError, Parser, TokenIter};
+use crate::{ConsumableToken, Pattern, Parsable, ParseError, Parser, TokenIter};
 
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct LiteralStringValue {
@@ -209,6 +209,7 @@ macro_rules! t {
 impl ConsumableToken for Token {}
 
 impl Parsable<Token> for Token {
+    type P = TokenParser;
     fn parser() -> TokenParser
     where
         Self: Sized,
@@ -217,7 +218,7 @@ impl Parsable<Token> for Token {
     }
 }
 
-pub struct TokenParser(Matcher<Token>);
+pub struct TokenParser(Pattern<Token>);
 impl Default for TokenParser {
     fn default() -> Self {
         Self(Default::default())
@@ -226,7 +227,7 @@ impl Default for TokenParser {
 
 
 impl TokenParser {
-    pub fn with_matcher(&mut self, matcher: Matcher<Token>) -> &mut Self {
+    pub fn with_matcher(&mut self, matcher: Pattern<Token>) -> &mut Self {
         self.0 = matcher; 
         self
     }

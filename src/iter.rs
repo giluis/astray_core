@@ -1,6 +1,5 @@
 use crate::{base_traits::Parsable, error::parse_error::ParseError, ConsumableToken, Parser};
 
-
 pub struct TokenIter<Token> {
     pub current: usize,
     pub tokens: Vec<Token>,
@@ -21,6 +20,7 @@ where
         }
     }
 
+    // TODO: rename to scope
     pub fn try_do<F, Q, E>(&mut self, f: F) -> Result<Q, E>
     where
         F: FnOnce(&mut TokenIter<TToken>) -> Result<Q, E>,
@@ -42,13 +42,15 @@ where
         self.parse_with_validator(&P::parser())
     }
 
-    pub fn parse_with_validator<P>(&mut self, parser: & impl Parser<TToken, P>) -> Result<P, ParseError>
+    pub fn parse_with_validator<P>(
+        &mut self,
+        parser: &impl Parser<TToken, P>,
+    ) -> Result<P, ParseError>
     where
         P: Parsable<TToken>,
     {
         self.try_do(|token_iter| parser.parse(token_iter))
     }
-
 
     pub fn parse_while<I, F, Q>(&mut self, _keep_going: F) -> I
     where
@@ -58,6 +60,10 @@ where
     {
         // TODO: implement this
         todo!("Parse while not yet implemented")
+    }
+
+    pub fn is_at_end(&self) -> bool {
+        self.current == self.tokens.len()
     }
 
     pub fn consume(&mut self) -> Option<TToken> {
@@ -82,7 +88,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::test_common::TestStruct;
-    use crate::{Parser, matcher, t, Matcher, Parsable, ParseError, Token, TokenIter, TokenParser};
+    use crate::{matcher, t, Pattern, Parsable, ParseError, Parser, Token, TokenIter, TokenParser};
 
     #[test]
     fn parse_if_match_match_enum_token() {
@@ -91,19 +97,27 @@ mod tests {
             Token::Identifier("Some identifier".to_string()),
         ]);
 
-        let result =  Token::parser().with_matcher(matcher!(Token::Comma)).parse(&mut iter);
+        let result = Token::parser()
+            .with_matcher(matcher!(Token::Comma))
+            .parse(&mut iter);
         assert_eq!(result, Ok(Token::Comma));
 
-        let result = Token::parser().with_matcher(matcher!(Token::Identifier(_))).parse(&mut iter);
+        let result = Token::parser()
+            .with_matcher(matcher!(Token::Identifier(_)))
+            .parse(&mut iter);
         assert_eq!(result, Ok(Token::Identifier("Some identifier".to_string())));
 
-        let result = Token::parser().with_matcher(matcher!(Token::Identifier(_))).parse(&mut iter);
+        let result = Token::parser()
+            .with_matcher(matcher!(Token::Identifier(_)))
+            .parse(&mut iter);
         assert_eq!(result, Err(ParseError::no_more_tokens::<Token>(2)));
 
         let mut iter: TokenIter<Token> =
             TokenIter::new(vec![Token::Identifier("Some identifier".to_string())]);
 
-        let result: Result<Token, _> = Token::parser().with_matcher(matcher!(Token::Comma)).parse(&mut iter);
+        let result: Result<Token, _> = Token::parser()
+            .with_matcher(matcher!(Token::Comma))
+            .parse(&mut iter);
         assert!(result.is_err());
     }
 
@@ -112,7 +126,9 @@ mod tests {
     fn failed_parse_if_match() {
         let tokens = vec![t!(litint 32)];
         let mut iter = TokenIter::new(tokens);
-        let result: Result<Token, _> = Token::parser().with_matcher(matcher!(t!(return))).parse(&mut iter);
+        let result: Result<Token, _> = Token::parser()
+            .with_matcher(matcher!(t!(return)))
+            .parse(&mut iter);
         assert!(result.is_err());
         dbg!(iter.current);
         assert!(iter.current == 0);
@@ -154,7 +170,8 @@ mod tests {
             equals_sign: t!( = ),
             value: parse_if_matched_value,
         };
-        let result = TestStruct::parser().parse(&mut iter)
+        let result = TestStruct::parser()
+            .parse(&mut iter)
             .expect("Should succeed, since tokens represent a valid TestStruct");
         assert_eq!(result, parse_if_matched_struct);
     }
@@ -180,31 +197,14 @@ mod tests {
     //     assert_eq!(iter.current, 1);
     // }
 
-    // #[test]
-    // fn test_push_pop() {
-    //     let tokens = vec![
-    //         t!(int),
-    //         Token::Identifier("variable".to_string()),
-    //         t!( = ),
-    //         Token::LiteralInt(2),
-    //         t!( ; ),
-    //     ];
-    //     let mut iter = TokenIter::new(tokens);
-    //     iter.push();
-    //     assert_eq!(iter.stack, vec![0]);
-    //     let r = Token::parser().with_matcher(matcher!(t!(int))).parse(&mut iter);
-    //     assert!(r.is_ok());
-    //     assert_eq!(iter.current, 1);
-    //     iter.pop();
-    //     assert_eq!(iter.current, 0);
-    // }
-
     #[test]
     fn test_parse_if_match_empty_token_list() {
         let tokens = vec![];
         let mut iter = TokenIter::new(tokens);
 
-        let result: Result<Token, _> = Token::parser().with_matcher(matcher!(t!(l_paren))).parse(&mut iter);
+        let result: Result<Token, _> = Token::parser()
+            .with_matcher(matcher!(t!(l_paren)))
+            .parse(&mut iter);
         assert!(result.is_err());
         assert!(iter.current == 0);
     }
@@ -214,16 +214,28 @@ mod tests {
         let tokens = vec![t!(l_paren), t!(r_paren), t!(,), t!(litint 4)];
         let mut iter = TokenIter::new(tokens);
 
-        let lparen_r: Token = Token::parser().with_matcher(matcher!(t!(l_paren))).parse(&mut iter).unwrap();
+        let lparen_r: Token = Token::parser()
+            .with_matcher(matcher!(t!(l_paren)))
+            .parse(&mut iter)
+            .unwrap();
         assert!(lparen_r == t!(l_paren));
 
-        let rparen_r: Token = Token::parser().with_matcher(matcher!(t!(r_paren))).parse(&mut iter).unwrap();
+        let rparen_r: Token = Token::parser()
+            .with_matcher(matcher!(t!(r_paren)))
+            .parse(&mut iter)
+            .unwrap();
         assert!(rparen_r == t!(r_paren));
 
-        let comma_r: Token =Token::parser().with_matcher(matcher!(t!(,))).parse(&mut iter).unwrap();
+        let comma_r: Token = Token::parser()
+            .with_matcher(matcher!(t!(,)))
+            .parse(&mut iter)
+            .unwrap();
         assert_eq!(comma_r, t!( , ));
 
-        let litint_r: Token = Token::parser().with_matcher(matcher!(t!(litint 4))).parse(&mut iter).unwrap();
+        let litint_r: Token = Token::parser()
+            .with_matcher(matcher!(t!(litint 4)))
+            .parse(&mut iter)
+            .unwrap();
         assert!(litint_r == t!(litint 4));
 
         assert!(iter.current == 4)

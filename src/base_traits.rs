@@ -2,50 +2,23 @@ use std::marker::PhantomData;
 
 use crate::{ParseError, TokenIter};
 
-#[macro_export]
-macro_rules! validator {
-    ($pattern:pat) => {
-        FunctionValidator::new(Matcher(|t|matches!(t, $pattern)))
-    };
-}
 
 #[macro_export]
 macro_rules! matcher {
     ($pattern:pat) => {
-        Matcher(|t|matches!(t, $pattern))
+        Pattern{
+            fun:|t| {matches!(t, $pattern)},
+            pat: stringify!($pattern)
+        }
     };
 }
 
-impl<P> Default for FunctionValidator<P> {
-    fn default() -> Self {
-        Self::new(Default::default())
-    }
-}
 
-pub struct FunctionValidator<P> {
-    matcher: Matcher<P>,
-}
-
-impl<P> FunctionValidator<P> {
-    pub fn new(matcher: Matcher<P>) -> Self {
-        Self { matcher }
-    }
-}
-
-impl<T: ConsumableToken, P: Parsable<T>> Parser<T, P> for FunctionValidator<P> {
-    fn parse(&self, iter: &mut TokenIter<T>) -> Result<P, ParseError> {
-        let r = iter.parse()?;
-        if (self.matcher)(&r) {
-            Ok(r)
-        } else {
-            Err(ParseError::parsed_but_unmatching(
-                iter.current,
-                &r,
-                // TODO: update error message
-                "TODO: check this",
-            ))
-        }
-    }
+#[macro_export]
+macro_rules! matcher_ref {
+    ($pattern:pat) => {
+        Matcher(|t| matches!(&t, $pattern))
+    };
 }
 
 pub trait ConsumableToken: Clone + std::fmt::Debug + Parsable<Self> {}
@@ -55,26 +28,43 @@ where
     Self: Sized + std::fmt::Debug,
     T: ConsumableToken,
 {
-    fn parser() -> impl Parser<T, Self> {
-        NoOpParser
-    }
 
+    type P: Parser<T, Self> = NoOpParser;
+    fn parser() -> Self::P{
+        Self::P::default()
+    }
 }
 
-#[derive(Clone)]
-pub struct Matcher<P>(pub fn(&P) -> bool);
+pub struct Pattern<P>{
+    pub fun: fn(&P) -> bool,
+    pub pat: &'static str
+}
 
-impl<P> Default for Matcher<P> {
+impl <P> Clone for Pattern<P> {
+    fn clone(&self) -> Self {
+        Self{
+            fun:self.fun.clone(), 
+            pat: self.pat}
+    }
+}
+
+impl<P> Default for Pattern<P> {
     fn default() -> Self {
-        Self(|_| true)
+        Self{fun:|_| true,pat: "_"}
     }
 }
 
-impl<P> std::ops::Deref for Matcher<P> {
+impl<P> std::ops::Deref for Pattern<P> {
     type Target = fn(&P) -> bool;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.fun
+    }
+}
+
+impl <P> std::fmt::Debug for Pattern<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Pattern").field("pat", &self.pat).finish()
     }
 }
 
@@ -83,6 +73,9 @@ where
     T: ConsumableToken,
     P: Parsable<T>,
 {
+    // //TODO: change to Target
+    // type ParseTarget: Parsable<T> = P;
+
     fn parse(&self, iter: &mut TokenIter<T>) -> Result<P, ParseError>;
 }
 
@@ -90,7 +83,10 @@ where
 pub struct NoOpParser;
 
 impl<T: ConsumableToken, P: Parsable<T>> Parser<T, P> for NoOpParser {
-    fn parse(&self, iter: &mut TokenIter<T>) -> Result<P, ParseError> {
-        iter.parse()
+    fn parse(
+        &self,
+        iter: &mut TokenIter<T>,
+    ) -> Result<P, ParseError> {
+        iter.parse::<P>()
     }
 }
